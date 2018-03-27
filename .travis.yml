@@ -1,0 +1,39 @@
+language: node_js
+node_js:
+  - node
+  - 8
+  - 6.10.3 # aws lambda
+
+before_install: which npx || yarn global add npx
+
+script:
+  - yarn typecheck
+  - yarn coverage
+
+after_success: npx codecov
+
+jobs:
+  include:
+    - stage: deploy
+      if: tag IS present
+      script: skip
+      after_success: echo Ready deploy...
+      deploy:
+        provider: npm
+        skip_cleanup: true
+        email: $NPM_EMAIL
+        api_key: $NPM_TOKEN
+        on:
+          tags: true
+          repo: vitarn/tdmo
+          node: node
+
+branches:
+  only:
+    - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
+
+cache: yarn
+
+notifications:
+  email: false
