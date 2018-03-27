@@ -1,6 +1,6 @@
 {
   "name": "tdmo",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Typescript (definition|decorator) AWS DynamoDB ORM",
   "repository": "https://github.com/vitarn/tdmo",
   "author": "colder",
