@@ -1,6 +1,6 @@
 # tiamo
 
-Typescript (definition|decorator) AWS DynamoDB ORM
+Typescript inborn AWS DynamoDB ORM
 
 [![License][ico-license]][link-license]
 [![NPM][ico-npm]][link-npm]
