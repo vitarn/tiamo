@@ -1,8 +1,8 @@
 {
-  "name": "tdmo",
+  "name": "tiamo",
   "version": "0.1.0",
-  "description": "Typescript (definition|decorator) AWS DynamoDB ORM",
-  "repository": "https://github.com/vitarn/tdmo",
+  "description": "Typescript inborn AWS DynamoDB ORM",
+  "repository": "https://github.com/vitarn/tiamo",
   "author": "colder",
   "license": "MIT",
   "scripts": {

@@ -1,4 +1,4 @@
-# tdmo
+# tiamo
 
 Typescript (definition|decorator) AWS DynamoDB ORM
 
@@ -9,12 +9,12 @@ Typescript (definition|decorator) AWS DynamoDB ORM
 
 ##
 
-[ico-license]: https://img.shields.io/github/license/vitarn/tdmo.svg
-[ico-npm]: https://img.shields.io/npm/v/tdmo.svg
-[ico-build]: https://travis-ci.org/vitarn/tdmo.svg?branch=master
-[ico-codecov]: https://codecov.io/gh/vitarn/tdmo/branch/master/graph/badge.svg
+[ico-license]: https://img.shields.io/github/license/vitarn/tiamo.svg
+[ico-npm]: https://img.shields.io/npm/v/tiamo.svg
+[ico-build]: https://travis-ci.org/vitarn/tiamo.svg?branch=master
+[ico-codecov]: https://codecov.io/gh/vitarn/tiamo/branch/master/graph/badge.svg
 
 [link-license]: ./blob/master/LICENSE
-[link-npm]: https://www.npmjs.com/package/tdmo
-[link-build]: https://travis-ci.org/vitarn/tdmo
-[link-codecov]: https://codecov.io/gh/vitarn/tdmo
+[link-npm]: https://www.npmjs.com/package/tiamo
+[link-build]: https://travis-ci.org/vitarn/tiamo
+[link-codecov]: https://codecov.io/gh/vitarn/tiamo

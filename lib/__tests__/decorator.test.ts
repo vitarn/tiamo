@@ -32,7 +32,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:hash']).toBe(true)
+            expect(Foo.metadata.name['tiamo:hash']).toBe(true)
         })
 
         it('mark range key', () => {
@@ -41,7 +41,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:range']).toBe(true)
+            expect(Foo.metadata.name['tiamo:range']).toBe(true)
         })
     })
 
@@ -52,7 +52,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index:global']).toEqual({
+            expect(Foo.metadata.name['tiamo:index:global']).toEqual({
                 name: 'name-global',
                 type: 'hash',
             })
@@ -69,7 +69,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index:global']).toEqual({
+            expect(Foo.metadata.name['tiamo:index:global']).toEqual({
                 name: 'name-global-index',
                 type: 'hash',
             })
@@ -102,7 +102,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index:local']).toEqual({
+            expect(Foo.metadata.name['tiamo:index:local']).toEqual({
                 name: 'name-local',
                 type: 'range',
             })
@@ -119,7 +119,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index:local']).toEqual({
+            expect(Foo.metadata.name['tiamo:index:local']).toEqual({
                 name: 'name-local-index',
                 type: 'range',
             })

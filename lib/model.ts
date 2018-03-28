@@ -30,12 +30,12 @@ export class Model extends Schema {
 
     static get hashKey() {
         const { metadata } = this
-        return Object.keys(metadata).find(key => metadata[key]['tdmo:hash'])
+        return Object.keys(metadata).find(key => metadata[key]['tiamo:hash'])
     }
 
     static get rangeKey() {
         const { metadata } = this
-        return Object.keys(metadata).find(key => metadata[key]['tdmo:range'])
+        return Object.keys(metadata).find(key => metadata[key]['tiamo:range'])
     }
 
     static get globalIndexes() {
