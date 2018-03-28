@@ -5,14 +5,15 @@ import { expression, ExpressionLogic } from './expression'
 
 export class Query<M extends Model, R extends M | M[]> {
     static QUERY_KEYS = `
-        TableName
-        IndexName Select Limit ConsistentRead
-        ScanIndexForward ExclusiveStartKey ReturnConsumedCapacity
-        ProjectionExpression FilterExpression KeyConditionExpression
+        TableName IndexName
+        KeyConditionExpression FilterExpression ProjectionExpression
         ExpressionAttributeNames ExpressionAttributeValues
+        Select Limit ConsistentRead
+        ScanIndexForward ExclusiveStartKey
+        ReturnConsumedCapacity
     `.split(/\s+/)
 
-    constructor(options = {} as QueryOptions) {
+    constructor(private options = {} as QueryOptions<M>) {
         this.options = options
 
         this.options.logic = this.options.logic || 'AND'
@@ -21,8 +22,6 @@ export class Query<M extends Model, R extends M | M[]> {
         this.options.names = this.options.names || {}
         this.options.values = this.options.values || {}
     }
-
-    options: QueryOptions
 
     where(key: string) {
         const { options } = this
@@ -79,16 +78,16 @@ export class Query<M extends Model, R extends M | M[]> {
         }
     }
 
-    or(func: (query: Query<M, R>) => any) {
+    or(func: (query: this) => any) {
         return this.logicalClause('OR', func)
     }
 
-    not(func: (query: Query<M, R>) => any) {
+    not(func: (query: this) => any) {
         return this.logicalClause('NOT', func)
     }
 
-    private logicalClause(logic: ExpressionLogic, func: (query: Query<M, R>) => any) {
-        const query = new Query<M, R>({ logic, leaf: true })
+    private logicalClause(logic: ExpressionLogic, func: (query) => any) {
+        const query = new Query({ logic, leaf: true })
         func(query)
         const json = query.toJSON()
         const { keyExprs, filterExprs, names, values } = this.options
@@ -122,8 +121,8 @@ export class Query<M extends Model, R extends M | M[]> {
             if (options.FilterExpression) options.FilterExpression = `(${options.FilterExpression})`
         }
 
-        options.ExpressionAttributeNames = names
-        options.ExpressionAttributeValues = values
+        if (Object.keys(names).length) options.ExpressionAttributeNames = names
+        if (Object.keys(values).length) options.ExpressionAttributeValues = values
 
         return (this.constructor as typeof Query).QUERY_KEYS.reduce((json, key) => {
             if (options[key]) {
@@ -181,13 +180,12 @@ export class Query<M extends Model, R extends M | M[]> {
             .then(res => {
                 if (this.options.one) {
                     if (res.length === 1) {
-                        return <M>new this.options.Model(res[0])
+                        onfulfilled(new this.options.Model(res[0]) as any)
                     }
                 } else {
-                    return res.map(attr => <M>new this.options.Model(attr))
+                    onfulfilled(res.map(attr => new this.options.Model(attr)) as any)
                 }
             })
-            .then(onfulfilled)
             .catch(onrejected)
     }
 
@@ -198,8 +196,8 @@ export class Query<M extends Model, R extends M | M[]> {
 
 /* TYPES */
 
-export interface QueryOptions extends Partial<DocumentClient.QueryInput> {
-    Model?: typeof Model
+export interface QueryOptions<M extends Model> extends Partial<DocumentClient.QueryInput> {
+    Model?: M['constructor']
     one?: boolean
     logic?: ExpressionLogic
     leaf?: boolean

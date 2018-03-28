@@ -52,16 +52,48 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index']).toEqual({ name: 'name', global: true })
+            expect(Foo.metadata.name['tdmo:index:global']).toEqual({
+                name: 'name-global',
+                type: 'hash',
+            })
+
+            expect(Foo.globalIndexes).toEqual([{
+                name: 'name-global',
+                hash: 'name',
+            }])
         })
 
         it('set global index name', () => {
             class Foo extends Model {
-                @globalIndex('name-global-index')
+                @globalIndex({ name: 'name-global-index' })
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index']).toEqual({ name: 'name-global-index', global: true })
+            expect(Foo.metadata.name['tdmo:index:global']).toEqual({
+                name: 'name-global-index',
+                type: 'hash',
+            })
+
+            expect(Foo.globalIndexes).toEqual([{
+                name: 'name-global-index',
+                hash: 'name',
+            }])
+        })
+
+        it ('set global index hash and range', () => {
+            class Foo extends Model {
+                @globalIndex({ name: 'name-age-global' })
+                name: string
+
+                @globalIndex({ name: 'name-age-global', type: 'range' })
+                age: number
+            }
+
+            expect(Foo.globalIndexes).toEqual([{
+                name: 'name-age-global',
+                hash: 'name',
+                range: 'age',
+            }])
         })
 
         it('set local index', () => {
@@ -70,16 +102,32 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index']).toEqual({ name: 'name' })
+            expect(Foo.metadata.name['tdmo:index:local']).toEqual({
+                name: 'name-local',
+                type: 'range',
+            })
+
+            expect(Foo.localIndexes).toEqual([{
+                name: 'name-local',
+                range: 'name',
+            }])
         })
 
         it('set local index name', () => {
             class Foo extends Model {
-                @localIndex('name-local-index')
+                @localIndex({ name: 'name-local-index' })
                 name: string
             }
 
-            expect(Foo.metadata.name['tdmo:index']).toEqual({ name: 'name-local-index' })
+            expect(Foo.metadata.name['tdmo:index:local']).toEqual({
+                name: 'name-local-index',
+                type: 'range',
+            })
+
+            expect(Foo.localIndexes).toEqual([{
+                name: 'name-local-index',
+                range: 'name',
+            }])
         })
     })
 })

@@ -30,20 +30,18 @@
     "typescript": "^2.7.2"
   },
   "peerDependencies": {
-    "aws-sdk": "*",
-    "joi": "<= 12"
+    "aws-sdk": "*"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
-    "lib/**/*.js",
-    "lib/**/*.d.ts"
+    "**/**.js",
+    "**/*.d.ts",
+    "!__tests__"
   ],
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(j|t)sx?$",
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(t)sx?$",
     "moduleFileExtensions": [
       "ts",
       "tsx",

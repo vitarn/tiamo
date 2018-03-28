@@ -6,12 +6,12 @@ import { expression, ExpressionLogic } from './expression'
 export class Update<M extends Model> {
     static UPDATE_KEYS = `
         Key TableName
-        ReturnValues ReturnConsumedCapacity ReturnItemCollectionMetrics
         UpdateExpression ConditionExpression
         ExpressionAttributeNames ExpressionAttributeValues
+        ReturnValues ReturnConsumedCapacity ReturnItemCollectionMetrics
     `.split(/\s+/)
 
-    constructor(options = {} as UpdateOptions) {
+    constructor(private options = {} as UpdateOptions<M>) {
         options = { ...options }
         this.options = options
 
@@ -25,9 +25,7 @@ export class Update<M extends Model> {
         options.values = options.values || {}
     }
 
-    options: UpdateOptions
-
-    cond(key: string) {
+    where(key: string) {
         const { options } = this
         const f = <T>(op: string, op2?: string) => (val?: T) => {
             const { exprs, names, values } = expression(key)(op, op2)(val)
@@ -60,15 +58,15 @@ export class Update<M extends Model> {
         }
     }
 
-    or(func: (update: Update<M>) => any) {
+    or(func: (update: this) => any) {
         return this.logicalClause('OR', func)
     }
 
-    not(func: (update: Update<M>) => any) {
+    not(func: (update: this) => any) {
         return this.logicalClause('NOT', func)
     }
 
-    private logicalClause(logic: ExpressionLogic, func: (update: Update<M>) => any) {
+    private logicalClause(logic: ExpressionLogic, func: (update) => any) {
         const update = new Update<M>({ logic, leaf: true })
         func(update)
         const json = update.toJSON()
@@ -101,7 +99,7 @@ export class Update<M extends Model> {
         }
     }
 
-    unset(...keys: string[]) {
+    remove(...keys: string[]) {
         const { options } = this
         keys.forEach(key => {
             const { exprs, names, values } = expression(key)('REMOVE')()
@@ -123,7 +121,7 @@ export class Update<M extends Model> {
         return this
     }
 
-    del(key: string, val: DocumentClient.DynamoDbSet | Set<number | string | DocumentClient.binaryType>) {
+    delete(key: string, val: DocumentClient.DynamoDbSet | Set<number | string | DocumentClient.binaryType>) {
         const { options } = this
         const { exprs, names, values } = expression(key)('DELETE')(val)
         options.deleteExprs = options.deleteExprs.concat(exprs)
@@ -167,9 +165,7 @@ export class Update<M extends Model> {
         ].filter(e => e)
         if (updateExprs.length) options.UpdateExpression = updateExprs.join(' ')
 
-        options.ExpressionAttributeNames = names
-
-        // There is not values if REMOVE and/or DELETE only.
+        if (Object.keys(names).length) options.ExpressionAttributeNames = names
         if (Object.keys(values).length) options.ExpressionAttributeValues = values
 
         return (this.constructor as typeof Update).UPDATE_KEYS.reduce((json, key) => {
@@ -191,7 +187,7 @@ export class Update<M extends Model> {
 
         return this.options.Model._update(params)
             .then(res => {
-                if (res) onfulfilled(<M>new this.options.Model(res))
+                if (res) onfulfilled(new this.options.Model(res) as M)
                 return onfulfilled(null)
             }, onrejected)
     }
@@ -203,8 +199,8 @@ export class Update<M extends Model> {
 
 /* TYPES */
 
-export interface UpdateOptions extends Partial<DocumentClient.UpdateItemInput> {
-    Model?: typeof Model
+export interface UpdateOptions<M extends Model> extends Partial<DocumentClient.UpdateItemInput> {
+    Model?: M['constructor']
     logic?: ExpressionLogic
     leaf?: boolean
     setExprs?: string[]

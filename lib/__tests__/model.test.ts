@@ -19,43 +19,6 @@ AWS.config.update({
 })
 
 describe('Model', () => {
-    describe('metadata', () => {
-        @tableName('posts')
-        class Post extends Model {
-            @hashKey
-            category: string
-
-            @rangeKey
-            year: number
-
-            @globalIndex
-            author: string
-
-            @localIndex
-            subcategory: string
-        }
-
-        it('has table name', () => {
-            expect(Post.tableName).toBe('posts')
-        })
-
-        it('has hash key', () => {
-            expect(Post.hashKey).toBe('category')
-        })
-
-        it('has range key', () => {
-            expect(Post.rangeKey).toBe('year')
-        })
-
-        it('have global indexes', () => {
-            expect(Post.globalIndexes).toEqual(['author'])
-        })
-
-        it('have local indexes', () => {
-            expect(Post.localIndexes).toEqual(['subcategory'])
-        })
-    })
-
     describe('validate', () => {
         class Foo extends Model {
             @required
@@ -158,7 +121,7 @@ describe('dynamodb', () => {
         it('save into db', async () => {
             await Foo.create({ id: '1' })
 
-            let foo = await Foo.findById<Foo>({ id: '1' })
+            let foo = await Foo.findKey({ id: '1' })
 
             expect(foo.id).toBe('1')
         })
@@ -243,19 +206,19 @@ describe('dynamodb', () => {
         })
 
         it('query one where id = 1', async () => {
-            let res = await Media.findOne<Media>().where('id').eq('1')
+            let res = await Media.findOne().where('id').eq('1')
 
             expect(res.id).toBe('1')
         })
 
         it('query where id = 1', async () => {
-            let res = await Media.find<Media>().where('id').eq('1')
+            let res = await Media.find().where('id').eq('1')
 
             expect(res.length).toBe(1)
         })
 
         it('query uid = 1 and between a c', async () => {
-            let res = await Media.find<Media>()
+            let res = await Media.find()
                 .index('uid-name')
                 .where('uid').eq('1')
                 .where('name').between(['a', 'c'])
@@ -267,7 +230,7 @@ describe('dynamodb', () => {
 
     describe('update', () => {
         // @tableName
-        class UpdateExample extends Model {
+        class Example extends Model {
             @hashKey id: string
 
             @required name: string
@@ -288,7 +251,7 @@ describe('dynamodb', () => {
 
         beforeEach(async () => {
             await dynamo.createTable({
-                TableName: 'UpdateExample',
+                TableName: 'Example',
                 AttributeDefinitions: [{
                     AttributeName: 'id',
                     AttributeType: 'S',
@@ -346,14 +309,14 @@ describe('dynamodb', () => {
             }).promise()
 
             await Promise.all([
-                UpdateExample.create({ id: '1', name: 'foo', age: 1, height: 30, weight: 10 }),
-                UpdateExample.create({ id: '2', name: 'bar', age: 10, height: 120, weight: 30 }),
-                UpdateExample.create({ id: '3', name: 'zoo', age: 10, height: 130, weight: 35 }),
+                Example.create({ id: '1', name: 'foo', age: 1, height: 30, weight: 10 }),
+                Example.create({ id: '2', name: 'bar', age: 10, height: 120, weight: 30 }),
+                Example.create({ id: '3', name: 'zoo', age: 10, height: 130, weight: 35 }),
             ])
         })
 
         it('update id = 1 set age = 2, height = 40, weight = 15', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('age').to(2)
                 .set('height').to(40)
                 .set('weight').to(15)
@@ -363,93 +326,93 @@ describe('dynamodb', () => {
         })
 
         it('update id = 1 set weight + 1', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('weight').plus(1)
 
             expect(e.weight).toBe(11)
         })
 
         it('update id = 1 set weight - 1', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('weight').minus(1)
 
             expect(e.weight).toBe(9)
         })
 
         it('update id = 1 set roles list_append [user]', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('roles').to(['user'])
 
             expect(e.roles).toEqual(['user'])
 
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            e = await Example.update({ id: '1' })
                 .set('roles').append(['vip'])
 
             expect(e.roles).toEqual(['user', 'vip'])
 
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            e = await Example.update({ id: '1' })
                 .set('roles').prepend(['gold'])
 
             expect(e.roles).toEqual(['gold', 'user', 'vip'])
         })
 
         it('update id = 1 set roles = [user] if not exists', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('roles').ifNotExists(['user'])
 
             expect(e.roles).toEqual(['user'])
 
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            e = await Example.update({ id: '1' })
                 .set('roles').ifNotExists(['again'])
 
             expect(e.roles).toEqual(['user'])
         })
 
         it('update id = 1 set pets[0].age += 1', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('pets').to([{ name: 'poly', age: 16 }])
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            e = await Example.update({ id: '1' })
                 .set('pets[0].age').plus(1)
-            
+
             expect(e.pets[0].age).toBe(17)
         })
 
         it('update id = 1 remove weight', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
-                .unset('weight')
+            let e = await Example.update({ id: '1' })
+                .remove('weight')
 
             expect(e.weight).toBeUndefined()
         })
 
         it('update id = 1 remove roles', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('roles').to(['user', 'vip'])
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
-                .unset('roles[1]')
+            e = await Example.update({ id: '1' })
+                .remove('roles[1]')
 
             expect(e.roles).toEqual(['user'])
         })
 
         it('update id = 1 add roles vip', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('roles').to(new Set(['user']))
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            e = await Example.update({ id: '1' })
                 .add('roles', new Set(['vip']))
 
             expect(e.roles).toEqual({ values: ['user', 'vip'], type: 'String' })
         })
 
         it('update id = 1 delete roles vip', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('roles').to(new Set(['user', 'vip']))
-            e = await UpdateExample.update<UpdateExample>({ id: '1' })
-                .del('roles', new Set(['vip']))
+            e = await Example.update({ id: '1' })
+                .delete('roles', new Set(['vip']))
 
             expect(e.roles).toEqual({ values: ['user'], type: 'String' })
         })
 
         it('update id = 1 quiet', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
                 .set('weight').to(9)
                 .quiet()
 
@@ -457,9 +420,187 @@ describe('dynamodb', () => {
         })
 
         it('update id = 1 nothing', async () => {
-            let e = await UpdateExample.update<UpdateExample>({ id: '1' })
+            let e = await Example.update({ id: '1' })
 
             expect(e).toBeUndefined()
         })
+    })
+
+    describe('remove', () => {
+        class Example extends Model {
+            @hashKey id: string
+
+            @required name: string
+            @required age: number
+            @required height: number
+            @required weight: number
+            @optional roles: string[]
+            @optional profile: {
+                displayName: string
+                phone: number
+                address: string
+            }
+            @optional pets: {
+                name: string
+                age: number
+            }[]
+        }
+
+        beforeEach(async () => {
+            await dynamo.createTable({
+                TableName: 'Example',
+                AttributeDefinitions: [{
+                    AttributeName: 'id',
+                    AttributeType: 'S',
+                }, {
+                    AttributeName: 'age',
+                    AttributeType: 'N',
+                }, {
+                    AttributeName: 'height',
+                    AttributeType: 'N',
+                }, {
+                    AttributeName: 'weight',
+                    AttributeType: 'N',
+                }],
+                KeySchema: [{
+                    AttributeName: 'id',
+                    KeyType: 'HASH',
+                }],
+                ProvisionedThroughput: {
+                    ReadCapacityUnits: 1,
+                    WriteCapacityUnits: 1,
+                },
+                GlobalSecondaryIndexes: [{
+                    IndexName: 'age-height',
+                    KeySchema: [{
+                        AttributeName: 'age',
+                        KeyType: 'HASH',
+                    }, {
+                        AttributeName: 'height',
+                        KeyType: 'RANGE',
+                    }],
+                    Projection: {
+                        ProjectionType: 'ALL',
+                    },
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1,
+                        WriteCapacityUnits: 1,
+                    },
+                }, {
+                    IndexName: 'age-weight',
+                    KeySchema: [{
+                        AttributeName: 'age',
+                        KeyType: 'HASH',
+                    }, {
+                        AttributeName: 'weight',
+                        KeyType: 'RANGE',
+                    }],
+                    Projection: {
+                        ProjectionType: 'ALL',
+                    },
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1,
+                        WriteCapacityUnits: 1,
+                    },
+                }],
+            }).promise()
+
+            await Promise.all([
+                Example.create({ id: '1', name: 'foo', age: 1, height: 30, weight: 10 }),
+                Example.create({ id: '2', name: 'bar', age: 10, height: 120, weight: 30 }),
+                Example.create({ id: '3', name: 'zoo', age: 10, height: 130, weight: 35 }),
+            ])
+        })
+
+        it('remove with hash', async () => {
+            await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
+            let e = await Example.remove({ id: '4' })
+
+            expect(e.name).toBe('joe')
+
+            let a = await Example.find().where('id').eq('4')
+
+            expect(a.length).toBe(0)
+        })
+
+        it('throw when remove with wrong condition', async () => {
+            await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
+            await expect(Example.remove({ id: '4' })
+                .where('age').gt(10)
+            ).rejects.toThrow('The conditional request failed')
+
+            let a = await Example.find().where('id').eq('4')
+
+            expect(a.length).toBe(1)
+        })
+
+        it('remove instance', async () => {
+            await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
+            let e = await Example.findKey({ id: '4' })
+            await e.remove()
+            let a = await Example.find().where('id').eq('4')
+
+            expect(a.length).toBe(0)
+        })
+    })
+
+    xit('', async () => {
+        await dynamo.createTable({
+            TableName: 'Example',
+            AttributeDefinitions: [{
+                AttributeName: 'id',
+                AttributeType: 'S',
+            }, {
+                AttributeName: 'name',
+                AttributeType: 'S',
+            }, {
+                AttributeName: 'age',
+                AttributeType: 'N',
+            }, {
+                AttributeName: 'height',
+                AttributeType: 'N',
+            }, {
+                AttributeName: 'weight',
+                AttributeType: 'N',
+            }],
+            KeySchema: [{
+                AttributeName: 'id',
+                KeyType: 'HASH',
+            }, {
+                AttributeName: 'name',
+                KeyType: 'RANGE',
+            }],
+            ProvisionedThroughput: {
+                ReadCapacityUnits: 1,
+                WriteCapacityUnits: 1,
+            },
+            GlobalSecondaryIndexes: [{
+                IndexName: 'age',
+                KeySchema: [{
+                    AttributeName: 'age',
+                    KeyType: 'HASH',
+                }],
+                Projection: {
+                    ProjectionType: 'ALL',
+                },
+                ProvisionedThroughput: {
+                    ReadCapacityUnits: 1,
+                    WriteCapacityUnits: 1,
+                },
+            }],
+            LocalSecondaryIndexes: [{
+                IndexName: 'age',
+                KeySchema: [{
+                    AttributeName: 'id',
+                    KeyType: 'HASH',
+                }, {
+                    AttributeName: 'age',
+                    KeyType: 'RANGE',
+                }],
+                Projection: {
+                    ProjectionType: 'ALL',
+                },
+            }],
+        }).promise()
     })
 })

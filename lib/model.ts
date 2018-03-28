@@ -5,25 +5,26 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { dynamodbFor } from './metadata'
 import { Query } from './query'
 import { Update } from './update'
+import { Delete } from './delete'
 
 const log = debug('model')
 
 export class Model extends Schema {
     static AWS = AWS
 
-    static _documentClient
-    static get client(): DocumentClient {
+    static _documentClient: DocumentClient
+    static get client() {
         return this._documentClient
             || (this._documentClient = new DocumentClient())
     }
 
-    static _ddb
+    static _ddb: DynamoDB
     static get ddb() {
         return this._ddb
             || (this._ddb = new DynamoDB())
     }
 
-    static get tableName() {
+    static get tableName(): string {
         return dynamodbFor(this.prototype).tableName || this.name
     }
 
@@ -38,51 +39,77 @@ export class Model extends Schema {
     }
 
     static get globalIndexes() {
-        const { metadata } = this
-        return Object.keys(metadata).filter(key => metadata[key]['tdmo:index'] && metadata[key]['tdmo:index'].global)
+        return dynamodbFor(this.prototype).globalIndexes
     }
 
     static get localIndexes() {
-        const { metadata } = this
-        return Object.keys(metadata).filter(key => metadata[key]['tdmo:index'] && !metadata[key]['tdmo:index'].global)
+        return dynamodbFor(this.prototype).localIndexes
     }
 
-    static async create<M extends Model>(obj, options = {}) {
-        return (<M>new this(obj)).save(options)
+    static async create<M extends Model>(this: ModelStatic<M>, obj, options = {}) {
+        return (new this(obj) as M).save(options)
     }
 
-    static async findById<M extends Model>(Key) {
-        return this._get({ Key }).then(Item => <M>new this(Item))
+    static async findKey<M extends Model>(this: ModelStatic<M>, Key) {
+        return this._get({ Key }).then(Item => new this(Item) as M)
     }
 
-    static find<M extends Model>() {
+    static find<M extends Model>(this: ModelStatic<M>) {
         return new Query<M, M[]>({ Model: this })
     }
 
-    static findOne<M extends Model>() {
+    static findOne<M extends Model>(this: ModelStatic<M>) {
         return new Query<M, M>({ Model: this, one: true })
     }
 
-    static update<M extends Model>(Key: DocumentClient.Key) {
+    static update<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return new Update<M>({ Model: this, Key })
+    }
+
+    static remove<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
+        return new Delete<M>({ Model: this, Key })
     }
 
     static async _put(params: Partial<DocumentClient.PutItemInput>) {
         const p = { ...params } as DocumentClient.PutItemInput
         p.TableName = p.TableName || this.tableName
-        return this.client.put(p).promise()
+        p.ReturnValues = p.ReturnValues || 'ALL_OLD'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
+
+        log('⇡ [PUT] request params:', p)
+
+        return this.client.put(p).promise().then(res => {
+            if (res.ConsumedCapacity) log('⇣ [PUT] consumed capacity: ', res.ConsumedCapacity)
+            if (res.ItemCollectionMetrics) log('⇣ [PUT] item collection metrics: ', res.ItemCollectionMetrics)
+            return res.Attributes
+        })
     }
 
     static async _get(params: Partial<DocumentClient.GetItemInput>) {
         const p = { ...params } as DocumentClient.GetItemInput
         p.TableName = p.TableName || this.tableName
-        return this.client.get(p).promise().then(res => res.Item)
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+
+        log('⇡ [GET] request params:', p)
+
+        return this.client.get(p).promise().then(res => {
+            if (res.ConsumedCapacity) log('⇣ [GET] consumed capacity: ', res.ConsumedCapacity)
+            return res.Item
+        })
     }
 
     static async _query(params: Partial<DocumentClient.QueryInput>) {
         const p = { ...params } as DocumentClient.QueryInput
         p.TableName = p.TableName || this.tableName
-        return this.client.query(p).promise().then(res => res.Items)
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+        
+        log('⇡ [QUERY] request params:', p)
+
+        return this.client.query(p).promise().then(res => {
+            if (res.ConsumedCapacity) log('⇣ [QUERY] consumed capacity: ', res.ConsumedCapacity)
+            return res.Items
+        })
     }
 
     static async _update(params: Partial<DocumentClient.UpdateItemInput>) {
@@ -92,11 +119,10 @@ export class Model extends Schema {
         p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
         p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
 
-        log('update params', p)
+        log('⇡ [UPDATE] request params:', p)
         return this.client.update(p).promise().then(res => {
-            // log('update response', res.$response)
-            if (res.ConsumedCapacity) log('update consumed capacity: ', res.ConsumedCapacity)
-            if (res.ItemCollectionMetrics) log('update item collection metrics: ', res.ItemCollectionMetrics)
+            if (res.ConsumedCapacity) log('⇣ [UPDATE] consumed capacity: ', res.ConsumedCapacity)
+            if (res.ItemCollectionMetrics) log('⇣ [UPDATE] item collection metrics: ', res.ItemCollectionMetrics)
             return res.Attributes
         })
     }
@@ -104,7 +130,17 @@ export class Model extends Schema {
     static async _delete(params: Partial<DocumentClient.DeleteItemInput>) {
         const p = { ...params } as DocumentClient.DeleteItemInput
         p.TableName = p.TableName || this.tableName
-        return this.client.delete(p).promise().then(res => res.Attributes)
+        p.ReturnValues = p.ReturnValues || 'ALL_OLD'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
+
+        log('⇡ [DELETE] request params:', p)
+
+        return this.client.delete(p).promise().then(res => {
+            if (res.ConsumedCapacity) log('⇣ [DELETE] consumed capacity: ', res.ConsumedCapacity)
+            if (res.ItemCollectionMetrics) log('⇣ [DELETE] item collection metrics: ', res.ItemCollectionMetrics)
+            return res.Attributes
+        })
     }
 
     /**
@@ -122,10 +158,20 @@ export class Model extends Schema {
         }).then(() => this)
     }
 
-    // async remove(options?) {
-    //     return this.constructor.client.delete({
-    //         TableName: this.constructor.tableName,
-    //         Key:
-    //     }).promise()
-    // }
+    async remove(options?) {
+        const { hashKey, rangeKey } = this.constructor
+        const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
+        if (rangeKey) Key[rangeKey] = this[rangeKey]
+        return this.constructor._delete({ Key })
+    }
+}
+
+/* TYPES */
+
+/**
+ * Model static method this type
+ * @see https://github.com/Microsoft/TypeScript/issues/5863#issuecomment-302891200
+ */
+export type ModelStatic<T> = typeof Model & {
+    new(...args): T
 }

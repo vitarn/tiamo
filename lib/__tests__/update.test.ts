@@ -5,14 +5,14 @@ describe('Update', () => {
     describe('toJSON', () => {
         it('support cond set unset del', () => {
             let u = new Update({ Key: { id: '1' }, TableName: 'users' })
-                .cond('active').eq(true)
+                .where('active').eq(true)
                 .set('name').to('abc')
                 .set('age').to(14)
                 .set('profile.tags[0]').to('cool')
-                .unset('ban', 'lock')
-                .unset('inactive')
-                .del('roles', new Set(['admin']))
-                .del('profile.tags', new Set(['bad']))
+                .remove('ban', 'lock')
+                .remove('inactive')
+                .delete('roles', new Set(['admin']))
+                .delete('profile.tags', new Set(['bad']))
 
             expect(u.toJSON()).toEqual({
                 Key: {
