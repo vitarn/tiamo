@@ -7,4 +7,4 @@ try {
     debug = debuglog
 }
 
-export default (namespace: string) => debug(`tdmo:${namespace}`)
+export default (namespace: string) => debug(`tiamo:${namespace}`)

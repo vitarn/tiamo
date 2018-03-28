@@ -31,7 +31,7 @@ export const tableName: FlexibleDecorator<string> = (...args) => {
 const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (target, key, desc) => {
     log('keyDescriptor', target, key, desc)
     required(target, key, desc)
-    metadataFor(target, key)[`tdmo:${type}`] = true
+    metadataFor(target, key)[`tiamo:${type}`] = true
     dynamodbFor(target)[`${type}Key`] = key
 }
 
@@ -58,7 +58,7 @@ const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (targe
     opts.type = opts.type || defaultType
 
     log('indexDescriptor', target, key, desc, opts)
-    metadataFor(target, key)[`tdmo:index:${scope}`] = opts
+    metadataFor(target, key)[`tiamo:index:${scope}`] = opts
 
     const dynamodb = dynamodbFor(target)
     const indexes: any[] = dynamodb[`${scope}Indexes`] = dynamodb[`${scope}Indexes`] || []
