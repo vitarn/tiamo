@@ -43,6 +43,34 @@ describe('decorator', () => {
 
             expect(Foo.metadata.name['tiamo:range']).toBe(true)
         })
+
+        it('hash/range key is required', () => {
+            class Foo extends Model {
+                @hashKey
+                name: string
+
+                @rangeKey
+                age: number
+            }
+
+            expect(() => new Foo().attempt()).toThrow('"name" is required')
+            expect(() => new Foo({ name: 'a' }).attempt()).toThrow('"age" is required')
+            expect(() => new Foo({ name: 'a', age: 1 }).attempt()).not.toThrow()
+        })
+
+        it('dont rewrite tdv metadata', () => {
+            class Foo extends Model {
+                @hashKey
+                @optional(j => j.string().default('n'))
+                name: string
+
+                @optional(j => j.string().default('l'))
+                @hashKey
+                label: string
+            }
+
+            expect(new Foo().attempt()).toEqual({ name: 'n', label: 'l' })
+        })
     })
 
     describe('indexes', () => {
@@ -128,6 +156,18 @@ describe('decorator', () => {
                 name: 'name-local-index',
                 range: 'name',
             }])
+        })
+
+        it('global/local index is optional', () => {
+            class Foo extends Model {
+                @globalIndex
+                name: string
+
+                @localIndex
+                age: number
+            }
+
+            expect(() => new Foo().attempt()).not.toThrow()
         })
     })
 })

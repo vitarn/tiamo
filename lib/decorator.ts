@@ -1,5 +1,5 @@
 import debug from './debug'
-import { metadataFor, createDecorator, optional, HandleDescriptor, FlexibleDecorator} from 'tdv'
+import { metadataFor, createDecorator, required, optional, HandleDescriptor, FlexibleDecorator} from 'tdv'
 import { dynamodbFor } from './metadata'
 import { Model } from './model'
 
@@ -30,8 +30,15 @@ export const tableName: FlexibleDecorator<string> = (...args) => {
 
 const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (target, key, desc) => {
     log('keyDescriptor', target, key, desc)
-    optional(target, key, desc)
-    metadataFor(target, key)[`tiamo:${type}`] = true
+
+    const metadata = metadataFor(target, key)
+
+    // Dont rewrite existed tdv metadata
+    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+        required(target, key, desc)
+    }
+
+    metadata[`tiamo:${type}`] = true
     dynamodbFor(target)[`${type}Key`] = key
 }
 
@@ -58,7 +65,15 @@ const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (targe
     opts.type = opts.type || defaultType
 
     log('indexDescriptor', target, key, desc, opts)
-    metadataFor(target, key)[`tiamo:index:${scope}`] = opts
+
+    const metadata = metadataFor(target, key)
+
+    // Dont rewrite existed tdv metadata
+    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+        optional(target, key, desc)
+    }
+
+    metadata[`tiamo:index:${scope}`] = opts
 
     const dynamodb = dynamodbFor(target)
     const indexes: any[] = dynamodb[`${scope}Indexes`] = dynamodb[`${scope}Indexes`] || []
