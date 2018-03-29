@@ -1,5 +1,5 @@
 import debug from './debug'
-import { metadataFor, createDecorater, required, HandleDescriptor, FlexibleDecorator} from 'tdv'
+import { metadataFor, createDecorator, optional, HandleDescriptor, FlexibleDecorator} from 'tdv'
 import { dynamodbFor } from './metadata'
 import { Model } from './model'
 
@@ -25,12 +25,12 @@ const tableDescriptor: HandleDescriptor = (target, [name]) => {
  *      `@tableName('foos') class Foo extends Model {} // Foo.tableName === 'foos'`
  */
 export const tableName: FlexibleDecorator<string> = (...args) => {
-    return createDecorater(tableDescriptor, args)
+    return createDecorator(tableDescriptor, args)
 }
 
 const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (target, key, desc) => {
     log('keyDescriptor', target, key, desc)
-    required(target, key, desc)
+    optional(target, key, desc)
     metadataFor(target, key)[`tiamo:${type}`] = true
     dynamodbFor(target)[`${type}Key`] = key
 }
@@ -39,14 +39,14 @@ const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (tar
  * Mark DynamoDB hash key
  */
 export const hashKey: FlexibleDecorator<never> = (...args) => {
-    return createDecorater(keyDescriptor('hash'), args)
+    return createDecorator(keyDescriptor('hash'), args)
 }
 
 /**
  * Mark DynamoDB range key
  */
 export const rangeKey: FlexibleDecorator<never> = (...args) => {
-    return createDecorater(keyDescriptor('range'), args)
+    return createDecorator(keyDescriptor('range'), args)
 }
 
 const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (target, key, desc, [options]) => {
@@ -78,14 +78,14 @@ const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (targe
  * Mark DynamoDB global index
  */
 export const globalIndex: FlexibleDecorator<IndexKeyOptions> = (...args) => {
-    return createDecorater(indexDescriptor(true), args)
+    return createDecorator(indexDescriptor(true), args)
 }
 
 /**
  * Mark DynamoDB local index
  */
 export const localIndex: FlexibleDecorator<IndexKeyOptions> = (...args) => {
-    return createDecorater(indexDescriptor(), args)
+    return createDecorator(indexDescriptor(), args)
 }
 
 export type IndexKeyOptions = {

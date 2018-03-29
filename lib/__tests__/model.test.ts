@@ -21,9 +21,15 @@ AWS.config.update({
 describe('Model', () => {
     describe('validate', () => {
         class Foo extends Model {
-            @required
+            @optional(j => j.string()
+                .default(() => Math.random().toString(), 'random')
+            )
             id: string
         }
+
+        it('joi default', () => {
+            expect(new Foo().attempt().id).toBeTruthy()
+        })
 
         it('validate before save', async () => {
             await expect(Foo.create({ id: 1 })).rejects.toThrow()
