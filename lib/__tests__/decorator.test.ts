@@ -80,7 +80,7 @@ describe('decorator', () => {
             }])
         })
 
-        it ('set global index hash and range', () => {
+        it('set composite global index', () => {
             class Foo extends Model {
                 @globalIndex({ name: 'name-age-global' })
                 name: string

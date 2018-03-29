@@ -179,7 +179,9 @@ export class Query<M extends Model, R extends M | M[]> {
         return this.options.Model._query(params)
             .then(res => {
                 if (this.options.one) {
-                    if (res.length === 1) {
+                    if (res.length === 0) {
+                        onfulfilled(null)
+                    } else {
                         onfulfilled(new this.options.Model(res[0]) as any)
                     }
                 } else {
