@@ -43,6 +43,20 @@ describe('decorator', () => {
 
             expect(Foo.metadata.name['tiamo:range']).toBe(true)
         })
+
+        it('dont rewrite tdv metadata', () => {
+            class Foo extends Model {
+                @hashKey
+                @optional(j => j.string().default('n'))
+                name: string
+
+                @optional(j => j.string().default('l'))
+                @hashKey
+                label: string
+            }
+
+            expect(new Foo().attempt()).toEqual({ name: 'n', label: 'l' })
+        })
     })
 
     describe('indexes', () => {

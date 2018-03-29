@@ -30,8 +30,15 @@ export const tableName: FlexibleDecorator<string> = (...args) => {
 
 const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (target, key, desc) => {
     log('keyDescriptor', target, key, desc)
-    optional(target, key, desc)
-    metadataFor(target, key)[`tiamo:${type}`] = true
+
+    const metadata = metadataFor(target, key)
+
+    // Dont rewrite existed tdv metadata
+    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+        optional(target, key, desc)
+    }
+
+    metadata[`tiamo:${type}`] = true
     dynamodbFor(target)[`${type}Key`] = key
 }
 
