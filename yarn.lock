@@ -3653,9 +3653,9 @@ tar@^2.2.1:
     fstream "^1.0.2"
     inherits "2"
 
-tdv@^0.1.2:
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/tdv/-/tdv-0.1.2.tgz#b41ba0e591ca52ab2b0c733fd239e720bc0cac24"
+tdv@^0.1.3:
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/tdv/-/tdv-0.1.3.tgz#84085896d27a4941917815febf785a1fa739ca88"
 
 test-exclude@^4.1.1:
   version "4.2.0"
