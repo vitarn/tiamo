@@ -249,6 +249,12 @@ describe('dynamodb', () => {
                 .where('uid').eq('1')
             
             expect(m.id).toBe('2')
+
+            let n = await Example.findOne()
+                .index('uid-global')
+                .where('uid').eq('-1')
+
+            expect(n).toBeNull()
         })
     })
 
