@@ -9,6 +9,13 @@ import { Delete } from './delete'
 
 const log = debug('model')
 
+export const $put = Symbol.for('put')
+export const $get = Symbol.for('get')
+export const $query = Symbol.for('query')
+export const $scan = Symbol.for('scan')
+export const $update = Symbol.for('update')
+export const $delete = Symbol.for('delete')
+
 export class Model extends Schema {
     static AWS = AWS
 
@@ -51,7 +58,7 @@ export class Model extends Schema {
     }
 
     static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
-        return this._get({ Key }).then(Item => new this(Item) as M)
+        return this[$get]({ Key }).then(Item => Item && new this(Item) as M)
     }
 
     static find<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
@@ -80,7 +87,7 @@ export class Model extends Schema {
         return new Delete<M>({ Model: this, Key })
     }
 
-    static _put(params: Partial<DocumentClient.PutItemInput>) {
+    static [$put](params: Partial<DocumentClient.PutItemInput>) {
         const p = { ...params } as DocumentClient.PutItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
@@ -96,7 +103,7 @@ export class Model extends Schema {
         })
     }
 
-    static _get(params: Partial<DocumentClient.GetItemInput>) {
+    static [$get](params: Partial<DocumentClient.GetItemInput>) {
         const p = { ...params } as DocumentClient.GetItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
@@ -109,7 +116,7 @@ export class Model extends Schema {
         })
     }
 
-    static _query(params: Partial<DocumentClient.QueryInput>) {
+    static [$query](params: Partial<DocumentClient.QueryInput>) {
         const p = { ...params } as DocumentClient.QueryInput
         p.TableName = p.TableName || this.tableName
         p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
@@ -122,7 +129,7 @@ export class Model extends Schema {
         })
     }
 
-    static _update(params: Partial<DocumentClient.UpdateItemInput>) {
+    static [$update](params: Partial<DocumentClient.UpdateItemInput>) {
         const p = { ...params } as DocumentClient.UpdateItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_NEW'
@@ -137,7 +144,7 @@ export class Model extends Schema {
         })
     }
 
-    static _delete(params: Partial<DocumentClient.DeleteItemInput>) {
+    static [$delete](params: Partial<DocumentClient.DeleteItemInput>) {
         const p = { ...params } as DocumentClient.DeleteItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
@@ -163,7 +170,7 @@ export class Model extends Schema {
     }
 
     async save(options?) {
-        return this.constructor._put({
+        return this.constructor[$put]({
             Item: this.attempt(),
         }).then(() => this)
     }
@@ -172,7 +179,7 @@ export class Model extends Schema {
         const { hashKey, rangeKey } = this.constructor
         const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
         if (rangeKey) Key[rangeKey] = this[rangeKey]
-        return this.constructor._delete({ Key })
+        return this.constructor[$delete]({ Key })
     }
 }
 

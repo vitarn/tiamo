@@ -1,6 +1,6 @@
 import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { Model } from './model'
+import { Model, $delete } from './model'
 import { expression, ExpressionLogic } from './expression'
 
 export class Delete<M extends Model> {
@@ -123,7 +123,7 @@ export class Delete<M extends Model> {
     ) {
         const params = this.toJSON()
 
-        return this.options.Model._delete(params)
+        return this.options.Model[$delete](params)
             .then(res => {
                 if (res) onfulfilled(new this.options.Model(res) as M)
                 return onfulfilled(null)
