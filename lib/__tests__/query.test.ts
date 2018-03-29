@@ -30,6 +30,12 @@ describe('Query', () => {
                 }
             })
         })
+
+        it('set Limit = 1 if one', () => {
+            let q = new Query({ one: true })
+
+            expect(q.toJSON()).toEqual({ Limit: 1 })
+        })
     })
 
     describe('exprs', () => {
