@@ -129,7 +129,7 @@ describe('dynamodb', () => {
 
     describe('query', () => {
         // @tableName
-        class Media extends Model {
+        class Example extends Model {
             @hashKey id: string
 
             @required type: string
@@ -141,7 +141,7 @@ describe('dynamodb', () => {
 
         beforeEach(async () => {
             await dynamo.createTable({
-                TableName: 'Media',
+                TableName: 'Example',
                 AttributeDefinitions: [{
                     AttributeName: 'id',
                     AttributeType: 'S',
@@ -164,7 +164,7 @@ describe('dynamodb', () => {
                     WriteCapacityUnits: 1,
                 },
                 GlobalSecondaryIndexes: [{
-                    IndexName: 'uid-name',
+                    IndexName: 'uid-global',
                     KeySchema: [{
                         AttributeName: 'uid',
                         KeyType: 'HASH',
@@ -180,7 +180,23 @@ describe('dynamodb', () => {
                         WriteCapacityUnits: 1,
                     },
                 }, {
-                    IndexName: 'uid-type',
+                    IndexName: 'uid-name-global',
+                    KeySchema: [{
+                        AttributeName: 'uid',
+                        KeyType: 'HASH',
+                    }, {
+                        AttributeName: 'name',
+                        KeyType: 'RANGE',
+                    }],
+                    Projection: {
+                        ProjectionType: 'ALL',
+                    },
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1,
+                        WriteCapacityUnits: 1,
+                    },
+                }, {
+                    IndexName: 'uid-type-global',
                     KeySchema: [{
                         AttributeName: 'uid',
                         KeyType: 'HASH',
@@ -199,32 +215,46 @@ describe('dynamodb', () => {
             }).promise()
 
             await Promise.all([
-                Media.create({ id: '1', name: 'foo', uid: '1', type: 'video', len: 30, age: 4 }),
-                Media.create({ id: '2', name: 'bar', uid: '1', type: 'audio', len: 60, age: 10 }),
-                Media.create({ id: '3', name: 'zoo', uid: '2', type: 'video', len: 90, age: 14 }),
+                Example.create({ id: '1', name: 'foo', uid: '1', type: 'video', len: 30, age: 4 }),
+                Example.create({ id: '2', name: 'bar', uid: '1', type: 'audio', len: 60, age: 10 }),
+                Example.create({ id: '3', name: 'zoo', uid: '2', type: 'video', len: 90, age: 14 }),
             ])
         })
 
         it('query one where id = 1', async () => {
-            let res = await Media.findOne().where('id').eq('1')
+            let res = await Example.findOne().where('id').eq('1')
 
             expect(res.id).toBe('1')
         })
 
         it('query where id = 1', async () => {
-            let res = await Media.find().where('id').eq('1')
+            let res = await Example.find().where('id').eq('1')
 
             expect(res.length).toBe(1)
         })
 
         it('query uid = 1 and between a c', async () => {
-            let res = await Media.find()
-                .index('uid-name')
+            let res = await Example.find()
+                .index('uid-name-global')
                 .where('uid').eq('1')
                 .where('name').between(['a', 'c'])
 
             expect(res.length).toBe(1)
             expect(res[0].id).toBe('2')
+        })
+
+        it('query one from index uid-global', async () => {
+            let m = await Example.findOne()
+                .index('uid-global')
+                .where('uid').eq('1')
+            
+            expect(m.id).toBe('2')
+
+            let n = await Example.findOne()
+                .index('uid-global')
+                .where('uid').eq('-1')
+
+            expect(n).toBeNull()
         })
     })
 
