@@ -1,6 +1,6 @@
 import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { Model } from './model'
+import { Model, $query } from './model'
 import { expression, ExpressionLogic } from './expression'
 
 export class Query<M extends Model, R extends M | M[]> {
@@ -173,16 +173,16 @@ export class Query<M extends Model, R extends M | M[]> {
     }
 
     then<TRes>(
-        onfulfilled?: (value: R) => TRes | PromiseLike<TRes>,
+        onfulfilled?: (value?: R) => TRes | PromiseLike<TRes>,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         const params = this.toJSON()
 
-        return this.options.Model._query(params)
+        return this.options.Model[$query](params)
             .then(res => {
                 if (this.options.one) {
                     if (res.length === 0) {
-                        onfulfilled(null)
+                        onfulfilled()
                     } else {
                         onfulfilled(new this.options.Model(res[0]) as any)
                     }

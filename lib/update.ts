@@ -1,6 +1,6 @@
 import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { Model } from './model'
+import { Model, $update } from './model'
 import { expression, ExpressionLogic } from './expression'
 
 export class Update<M extends Model> {
@@ -183,12 +183,12 @@ export class Update<M extends Model> {
         const params = this.toJSON()
 
         // Nothing to update
-        if (!params.UpdateExpression) return onfulfilled()
+        if (!params.UpdateExpression) return onrejected(new Error('Update expression is empty'))
 
-        return this.options.Model._update(params)
+        return this.options.Model[$update](params)
             .then(res => {
                 if (res) onfulfilled(new this.options.Model(res) as M)
-                return onfulfilled(null)
+                return onfulfilled()
             }, onrejected)
     }
 

@@ -133,6 +133,37 @@ describe('dynamodb', () => {
         })
     })
 
+    describe('get', () => {
+        class Example extends Model {
+            @required
+            id: string
+        }
+
+        beforeEach(async () => {
+            await dynamo.createTable({
+                TableName: 'Example',
+                AttributeDefinitions: [{
+                    AttributeName: 'id',
+                    AttributeType: 'S',
+                }],
+                KeySchema: [{
+                    AttributeName: 'id',
+                    KeyType: 'HASH',
+                }],
+                ProvisionedThroughput: {
+                    ReadCapacityUnits: 1,
+                    WriteCapacityUnits: 1,
+                }
+            } as AWS.DynamoDB.CreateTableInput).promise()
+        })
+
+        it('return undefined if not found', async () => {
+            let e = await Example.get({ id: '1' })
+            
+            expect(e).toBeUndefined()
+        })
+    })
+
     describe('query', () => {
         // @tableName
         class Example extends Model {
@@ -260,7 +291,7 @@ describe('dynamodb', () => {
                 .index('uid-global')
                 .where('uid').eq('-1')
 
-            expect(n).toBeNull()
+            expect(n).toBeUndefined()
         })
     })
 
@@ -452,13 +483,11 @@ describe('dynamodb', () => {
                 .set('weight').to(9)
                 .quiet()
 
-            expect(e).toBeNull()
+            expect(e).toBeUndefined()
         })
 
         it('update id = 1 nothing', async () => {
-            let e = await Example.update({ id: '1' })
-
-            expect(e).toBeUndefined()
+            await expect(Example.update({ id: '1' })).rejects.toThrow('Update expression is empty')
         })
     })
 
