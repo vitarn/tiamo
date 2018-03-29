@@ -127,7 +127,7 @@ describe('dynamodb', () => {
         it('save into db', async () => {
             await Foo.create({ id: '1' })
 
-            let foo = await Foo.findKey({ id: '1' })
+            let foo = await Foo.get({ id: '1' })
 
             expect(foo.id).toBe('1')
         })
@@ -572,7 +572,7 @@ describe('dynamodb', () => {
 
         it('remove instance', async () => {
             await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
-            let e = await Example.findKey({ id: '4' })
+            let e = await Example.get({ id: '4' })
             await e.remove()
             let a = await Example.find().where('id').eq('4')
 

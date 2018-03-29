@@ -12,13 +12,13 @@ const log = debug('model')
 export class Model extends Schema {
     static AWS = AWS
 
-    static _documentClient: DocumentClient
+    protected static _documentClient: DocumentClient
     static get client() {
         return this._documentClient
             || (this._documentClient = new DocumentClient())
     }
 
-    static _ddb: DynamoDB
+    protected static _ddb: DynamoDB
     static get ddb() {
         return this._ddb
             || (this._ddb = new DynamoDB())
@@ -46,20 +46,30 @@ export class Model extends Schema {
         return dynamodbFor(this.prototype).localIndexes
     }
 
-    static async create<M extends Model>(this: ModelStatic<M>, obj, options = {}) {
+    static create<M extends Model>(this: ModelStatic<M>, obj, options = {}) {
         return (new this(obj) as M).save(options)
     }
 
-    static async findKey<M extends Model>(this: ModelStatic<M>, Key) {
+    static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return this._get({ Key }).then(Item => new this(Item) as M)
     }
 
-    static find<M extends Model>(this: ModelStatic<M>) {
-        return new Query<M, M[]>({ Model: this })
+    static find<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
+        return Object.keys(Key).reduce(
+            (q, k) => q.where(k).eq(Key[k]),
+            new Query<M, M[]>({ Model: this }),
+        )
     }
 
-    static findOne<M extends Model>(this: ModelStatic<M>) {
-        return new Query<M, M>({ Model: this, one: true })
+    static findOne<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
+        return Object.keys(Key).reduce(
+            (q, k) => q.where(k).eq(Key[k]),
+            new Query<M, M>({ Model: this, one: true }),
+        )
+    }
+
+    static scan<M extends Model>(this: ModelStatic<M>) {
+        throw Error('Not implement')
     }
 
     static update<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
@@ -70,7 +80,7 @@ export class Model extends Schema {
         return new Delete<M>({ Model: this, Key })
     }
 
-    static async _put(params: Partial<DocumentClient.PutItemInput>) {
+    static _put(params: Partial<DocumentClient.PutItemInput>) {
         const p = { ...params } as DocumentClient.PutItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
@@ -86,7 +96,7 @@ export class Model extends Schema {
         })
     }
 
-    static async _get(params: Partial<DocumentClient.GetItemInput>) {
+    static _get(params: Partial<DocumentClient.GetItemInput>) {
         const p = { ...params } as DocumentClient.GetItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
@@ -99,11 +109,11 @@ export class Model extends Schema {
         })
     }
 
-    static async _query(params: Partial<DocumentClient.QueryInput>) {
+    static _query(params: Partial<DocumentClient.QueryInput>) {
         const p = { ...params } as DocumentClient.QueryInput
         p.TableName = p.TableName || this.tableName
         p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
-        
+
         log('⇡ [QUERY] request params:', p)
 
         return this.client.query(p).promise().then(res => {
@@ -112,7 +122,7 @@ export class Model extends Schema {
         })
     }
 
-    static async _update(params: Partial<DocumentClient.UpdateItemInput>) {
+    static _update(params: Partial<DocumentClient.UpdateItemInput>) {
         const p = { ...params } as DocumentClient.UpdateItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_NEW'
@@ -127,7 +137,7 @@ export class Model extends Schema {
         })
     }
 
-    static async _delete(params: Partial<DocumentClient.DeleteItemInput>) {
+    static _delete(params: Partial<DocumentClient.DeleteItemInput>) {
         const p = { ...params } as DocumentClient.DeleteItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
@@ -158,7 +168,7 @@ export class Model extends Schema {
         }).then(() => this)
     }
 
-    async remove(options?) {
+    remove(options?) {
         const { hashKey, rangeKey } = this.constructor
         const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
         if (rangeKey) Key[rangeKey] = this[rangeKey]
@@ -170,8 +180,13 @@ export class Model extends Schema {
 
 /**
  * Model static method this type
+ * This hack make sub class static method return sub instance
+ * But break IntelliSense autocomplete
+ * @example
+ *      static method<M extends Class>(this: ModelStatic<M>)
  * @see https://github.com/Microsoft/TypeScript/issues/5863#issuecomment-302891200
  */
 export type ModelStatic<T> = typeof Model & {
     new(...args): T
+    // get(...args): any // IntelliSense still not work :(
 }

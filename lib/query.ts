@@ -124,6 +124,8 @@ export class Query<M extends Model, R extends M | M[]> {
         if (Object.keys(names).length) options.ExpressionAttributeNames = names
         if (Object.keys(values).length) options.ExpressionAttributeValues = values
 
+        if (options.one && !options.Limit) options.Limit = 1
+
         return (this.constructor as typeof Query).QUERY_KEYS.reduce((json, key) => {
             if (options[key]) {
                 json[key] = options[key]
