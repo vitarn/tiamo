@@ -1,6 +1,6 @@
 {
   "name": "tiamo",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Typescript inborn AWS DynamoDB ORM",
   "repository": "https://github.com/vitarn/tiamo",
   "author": "colder",
