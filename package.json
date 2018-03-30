@@ -24,7 +24,7 @@
     "aws-sdk": "^2.211.1",
     "dynalite": "^1.2.0",
     "jest": "^22.4.2",
-    "joi": "12",
+    "joi": "^13.1.2",
     "standard-version": "^4.3.0",
     "ts-jest": "^22.4.2",
     "typescript": "^2.7.2"
