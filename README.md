@@ -1,5 +1,7 @@
 # tiamo
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/vitarn/tiamo.svg)](https://greenkeeper.io/)
+
 Typescript inborn AWS DynamoDB ORM
 
 [![License][ico-license]][link-license]
