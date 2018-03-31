@@ -53,8 +53,12 @@ export class Model extends Schema {
         return dynamodbFor(this.prototype).localIndexes
     }
 
-    static create<M extends Model>(this: ModelStatic<M>, obj, options = {}) {
-        return (new this(obj) as M).save(options)
+    static build<M extends Model>(this: ModelStatic<M>, props?: ModelProperties<M>) {
+        return new this(props) as M
+    }
+
+    static create<M extends Model>(this: ModelStatic<M>, props: ModelProperties<M>, options = {}) {
+        return this.build(props).save(options)
     }
 
     static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
@@ -166,7 +170,54 @@ export class Model extends Schema {
     ['constructor']: typeof Model
 
     constructor(props?) {
-        super(props)
+        super()
+        this.parse(props)
+    }
+
+    parse(props = {} as ModelProperties<this>) {
+        const { metadata } = this.constructor
+
+        for(const key in metadata) {
+            const meta = metadata[key]
+            const value = props[key]
+
+            const Ref = meta['tdv:ref']
+            const Joi = meta['tdv:joi']
+
+            if (Ref) {
+                // skip sub model
+                if (!(key in props)) continue
+
+                if (value instanceof Ref || value === null || value === undefined) {
+                    // pass sub model instance or null directly
+                    this[key] = value
+                    continue
+                } else if (!this[key]) {
+                    // init sub model if not exist
+                    this[key] = new Ref()
+                }
+
+                if (this[key].parse) {
+                    // sub model can parse value
+                    this[key].parse(value)
+                } else if (value && typeof value === 'object') {
+                    // non model class? Schema?
+                    Object.assign(this[key], value)
+                }
+            } else if (Joi) {
+                const result = Joi.validate(value)
+
+                if (result.error) {
+                    // joi invalid value
+                    this[key] = value
+                } else {
+                    // joi validate will cast trans and set default value
+                    this[key] = result.value
+                }
+            }
+        }
+
+        return this
     }
 
     async save(options?) {
@@ -188,7 +239,7 @@ export class Model extends Schema {
 /**
  * Model static method this type
  * This hack make sub class static method return sub instance
- * But break IntelliSense autocomplete
+ * But break IntelliSense autocomplete in Typescript@2.7
  * @example
  *      static method<M extends Class>(this: ModelStatic<M>)
  * @see https://github.com/Microsoft/TypeScript/issues/5863#issuecomment-302891200
@@ -214,4 +265,9 @@ export type ModelStatic<T> = typeof Model & {
  * 
  * @see http://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-8.html
  */
-export type ModelProperties<T> = Pick<T, { [K in keyof T]: T[K] extends Function ? never : K }[keyof T]>
+export type ModelProperties<T> = Pick<T, ScalarPropertyNames<T>> & PickModelProperties<T, ModelPropertyNames<T>>
+export type ScalarPropertyNames<T> = { [K in keyof T]: T[K] extends Model | Function ? never : K }[keyof T]
+export type ModelPropertyNames<T> = { [K in keyof T]: T[K] extends Model ? K : never }[keyof T]
+export type PickModelProperties<T, K extends keyof T> = { [P in K]: T[P] | ModelProperties<T[P]> }
+
+// export type ModelProperties<T> = Pick<T, { [K in keyof T]: T[K] extends Function ? never : K }[keyof T]>

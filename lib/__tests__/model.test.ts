@@ -1,5 +1,5 @@
 import dynalite from 'dynalite'
-import { Model } from '../model'
+import { Model, $put } from '../model'
 import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
 
 const { AWS } = Model
@@ -19,6 +19,179 @@ AWS.config.update({
 })
 
 describe('Model', () => {
+    describe('constructor', () => {
+        class Profile extends Model {
+            @required
+            name: string
+
+            @optional(j => j.number().default(1))
+            age?: number
+        }
+
+        class User extends Model {
+            @required
+            id: string
+
+            @required
+            profile: Profile
+        }
+
+        it('have 3 ways init a model', () => {
+            const props = {
+                id: '1',
+                profile: {
+                    name: 'foo'
+                }
+            }
+            const newUser = new User(props)
+            const buildUser = User.build(props)
+            const parseUser = new User().parse(props)
+
+            expect(newUser.profile).toBeInstanceOf(Profile)
+            expect(newUser.profile.age).toBe(1)
+
+            expect(buildUser).toEqual(newUser)
+            expect(parseUser).toEqual(newUser)
+        })
+    })
+
+    describe('parse', () => {
+        class Address extends Model {
+            @optional
+            province?: string
+
+            @optional
+            city?: string
+        }
+
+        // WARN: If put Profile late than User. User#profile design:type is undefined
+        class Profile extends Model {
+            @required
+            name: string
+
+            @optional(j => j.number().default(1))
+            age?: number
+
+            @optional
+            address?: Address
+        }
+
+        class User extends Model {
+            @required
+            id: string
+
+            @required
+            profile: Profile
+        }
+
+        it('parse object and init sub model', () => {
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    age: 10,
+                    address: {
+                        province: 'gz',
+                        city: 'sz',
+                    },
+                },
+            })
+
+            expect(user.profile).toBeInstanceOf(Profile)
+            expect(user.profile.address).toBeInstanceOf(Address)
+            expect(user.profile.address.city).toBe('sz')
+        })
+
+        it('skip sub model if not provide props', () => {
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                },
+            })
+
+            expect(user.profile.address).toBeUndefined()
+        })
+
+        it('accept sub model instance', () => {
+            const address = new Address()
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    address,
+                },
+            })
+
+            expect(user.profile.address).toBe(address)
+        })
+
+        it('leave null for sub model', () => {
+            expect(new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    address: null,
+                },
+            }).profile.address).toBeNull()
+        })
+
+        it('leave undefined for sub model', () => {
+            expect(new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    address: undefined,
+                },
+            }).profile.address).toBeUndefined()
+        })
+
+        it('init sub model even props is empty', () => {
+            expect(new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    address: {},
+                },
+            }).profile.address).toBeInstanceOf(Address)
+        })
+
+        it('fallback to joi default value', () => {
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                },
+            })
+
+            expect(user.profile.age).toBe(1)
+        })
+
+        it('cast value type by joi', () => {
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    age: ' 10 ' as any,
+                },
+            })
+
+            expect(user.profile.age).toBe(10)
+        })
+
+        it('leave wrong type value there', () => {
+            const user = new User().parse({
+                id: '1',
+                profile: {
+                    name: 'foo',
+                    age: '10y' as any,
+                },
+            })
+
+            expect(user.profile.age).toBe('10y')
+        })
+    })
+
     describe('validate', () => {
         class Foo extends Model {
             @optional(j => j.string()
@@ -32,7 +205,7 @@ describe('Model', () => {
         })
 
         it('validate before save', async () => {
-            await expect(Foo.create({ id: 1 })).rejects.toThrow()
+            await expect(Foo.create({ id: 1 as any })).rejects.toThrow()
         })
     })
 })
@@ -101,7 +274,6 @@ describe('dynamodb', () => {
     describe('save', () => {
         @tableName
         class Foo extends Model {
-            // ['constructor']: typeof Foo
             @required
             id: string
         }
@@ -130,6 +302,23 @@ describe('dynamodb', () => {
             let foo = await Foo.get({ id: '1' })
 
             expect(foo.id).toBe('1')
+        })
+
+        it('', async () => {
+            class Foo extends Model {
+                @optional(j => j.string().default('1'))
+                id?: string
+            }
+
+            const Item = new Foo().attempt()
+
+            // console.log(Item)
+
+            const foo = await Foo[$put]({
+                Item
+            })
+
+            // console.log(foo)
         })
     })
 
@@ -304,13 +493,13 @@ describe('dynamodb', () => {
             @required age: number
             @required height: number
             @required weight: number
-            @optional roles: string[]
-            @optional profile: {
+            @optional roles?: string[]
+            @optional profile?: {
                 displayName: string
                 phone: number
                 address: string
             }
-            @optional pets: {
+            @optional pets?: {
                 name: string
                 age: number
             }[]
@@ -507,13 +696,13 @@ describe('dynamodb', () => {
             @required age: number
             @required height: number
             @required weight: number
-            @optional roles: string[]
-            @optional profile: {
+            @optional roles?: string[]
+            @optional profile?: {
                 displayName: string
                 phone: number
                 address: string
             }
-            @optional pets: {
+            @optional pets?: {
                 name: string
                 age: number
             }[]
