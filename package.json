@@ -15,7 +15,7 @@
     "prepack": "tsc --removeComments --inlineSourceMap false | echo shut up"
   },
   "dependencies": {
-    "tdv": "^0.1.4"
+    "tdv": "^0.2.4"
   },
   "devDependencies": {
     "@types/jest": "^22.2.2",
