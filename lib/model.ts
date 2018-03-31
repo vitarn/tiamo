@@ -197,3 +197,21 @@ export type ModelStatic<T> = typeof Model & {
     new(...args): T
     // get(...args): any // IntelliSense still not work :(
 }
+
+/**
+ * Pick Model non function properties
+ * 
+ * @example
+ * 
+ *  class Foo {
+ *      constructor(props?: ModelProperties<Foo>) {
+ *          super(props) // props: { id: number, name?: string }
+ *      }
+ *      id: number
+ *      name?: string
+ *      say() {}
+ *  }
+ * 
+ * @see http://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-8.html
+ */
+export type ModelProperties<T> = Pick<T, { [K in keyof T]: T[K] extends Function ? never : K }[keyof T]>
