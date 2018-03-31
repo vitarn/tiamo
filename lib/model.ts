@@ -1,5 +1,5 @@
 import debug from './debug'
-import { Schema } from 'tdv'
+import { Schema, SchemaOptions, SchemaProperties } from 'tdv'
 import AWS, { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { dynamodbFor } from './metadata'
@@ -17,54 +17,83 @@ export const $update = Symbol.for('update')
 export const $delete = Symbol.for('delete')
 
 export class Model extends Schema {
+    /**
+     * AWS reference
+     */
     static AWS = AWS
 
     protected static _documentClient: DocumentClient
+    /**
+     * AWS DynamoDB DocumentClient instance
+     */
     static get client() {
         return this._documentClient
             || (this._documentClient = new DocumentClient())
     }
 
     protected static _ddb: DynamoDB
+    /**
+     * AWS DynamoDB instance
+     */
     static get ddb() {
         return this._ddb
             || (this._ddb = new DynamoDB())
     }
 
+    /**
+     * Table name store in metadata
+     */
     static get tableName(): string {
         return dynamodbFor(this.prototype).tableName || this.name
     }
 
+    /**
+     * HASH key store in metadata
+     */
     static get hashKey() {
         const { metadata } = this
         return Object.keys(metadata).find(key => metadata[key]['tiamo:hash'])
     }
 
+    /**
+     * RANGE key store in metadata
+     */
     static get rangeKey() {
         const { metadata } = this
         return Object.keys(metadata).find(key => metadata[key]['tiamo:range'])
     }
 
+    /**
+     * Global indexes definition store in metadata
+     */
     static get globalIndexes() {
         return dynamodbFor(this.prototype).globalIndexes
     }
 
+    /**
+     * Local indexes definition store in metadata
+     */
     static get localIndexes() {
         return dynamodbFor(this.prototype).localIndexes
     }
 
-    static build<M extends Model>(this: ModelStatic<M>, props?: ModelProperties<M>) {
-        return new this(props) as M
+    /**
+     * Create model instance. Build and save.
+     */
+    static create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {}) {
+        return (this.build(props, { convert: false }) as M).save(options)
     }
 
-    static create<M extends Model>(this: ModelStatic<M>, props: ModelProperties<M>, options = {}) {
-        return this.build(props).save(options)
-    }
-
+    /**
+     * Get item by Key
+     */
     static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return this[$get]({ Key }).then(Item => Item && new this(Item) as M)
     }
 
+    /**
+     * Find items by Key
+     */
     static find<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
         return Object.keys(Key).reduce(
             (q, k) => q.where(k).eq(Key[k]),
@@ -72,6 +101,9 @@ export class Model extends Schema {
         )
     }
 
+    /**
+     * Find one item by Key
+     */
     static findOne<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
         return Object.keys(Key).reduce(
             (q, k) => q.where(k).eq(Key[k]),
@@ -79,14 +111,23 @@ export class Model extends Schema {
         )
     }
 
+    /**
+     * Scan items
+     */
     static scan<M extends Model>(this: ModelStatic<M>) {
         throw Error('Not implement')
     }
 
+    /**
+     * Update item by Key
+     */
     static update<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return new Update<M>({ Model: this, Key })
     }
 
+    /**
+     * Remove item by Key
+     */
     static remove<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return new Delete<M>({ Model: this, Key })
     }
@@ -167,65 +208,26 @@ export class Model extends Schema {
     /**
      * @see https://github.com/Microsoft/TypeScript/issues/3841#issuecomment-337560146
      */
-    ['constructor']: typeof Model
+    ['constructor']: ModelStatic<this>
 
-    constructor(props?) {
-        super()
-        this.parse(props)
+    constructor(props?, options?: SchemaOptions) {
+        super(props, options)
     }
 
-    parse(props = {} as ModelProperties<this>) {
-        const { metadata } = this.constructor
-
-        for(const key in metadata) {
-            const meta = metadata[key]
-            const value = props[key]
-
-            const Ref = meta['tdv:ref']
-            const Joi = meta['tdv:joi']
-
-            if (Ref) {
-                // skip sub model
-                if (!(key in props)) continue
-
-                if (value instanceof Ref || value === null || value === undefined) {
-                    // pass sub model instance or null directly
-                    this[key] = value
-                    continue
-                } else if (!this[key]) {
-                    // init sub model if not exist
-                    this[key] = new Ref()
-                }
-
-                if (this[key].parse) {
-                    // sub model can parse value
-                    this[key].parse(value)
-                } else if (value && typeof value === 'object') {
-                    // non model class? Schema?
-                    Object.assign(this[key], value)
-                }
-            } else if (Joi) {
-                const result = Joi.validate(value)
-
-                if (result.error) {
-                    // joi invalid value
-                    this[key] = value
-                } else {
-                    // joi validate will cast trans and set default value
-                    this[key] = result.value
-                }
-            }
-        }
-
-        return this
-    }
-
+    /**
+     * Save into db
+     * 
+     * Validate before save. Throw `ValidateError` if invalid. Apply casting and default if valid.
+     */
     async save(options?) {
         return this.constructor[$put]({
-            Item: this.attempt(),
+            Item: this.validate({ apply: true, raise: true }).value,
         }).then(() => this)
     }
 
+    /**
+     * Remove from db by Key
+     */
     remove(options?) {
         const { hashKey, rangeKey } = this.constructor
         const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
@@ -240,34 +242,14 @@ export class Model extends Schema {
  * Model static method this type
  * This hack make sub class static method return sub instance
  * But break IntelliSense autocomplete in Typescript@2.7
+ * 
  * @example
+ * 
  *      static method<M extends Class>(this: ModelStatic<M>)
+ * 
  * @see https://github.com/Microsoft/TypeScript/issues/5863#issuecomment-302891200
  */
 export type ModelStatic<T> = typeof Model & {
     new(...args): T
     // get(...args): any // IntelliSense still not work :(
 }
-
-/**
- * Pick Model non function properties
- * 
- * @example
- * 
- *  class Foo {
- *      constructor(props?: ModelProperties<Foo>) {
- *          super(props) // props: { id: number, name?: string }
- *      }
- *      id: number
- *      name?: string
- *      say() {}
- *  }
- * 
- * @see http://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-8.html
- */
-export type ModelProperties<T> = Pick<T, ScalarPropertyNames<T>> & PickModelProperties<T, ModelPropertyNames<T>>
-export type ScalarPropertyNames<T> = { [K in keyof T]: T[K] extends Model | Function ? never : K }[keyof T]
-export type ModelPropertyNames<T> = { [K in keyof T]: T[K] extends Model ? K : never }[keyof T]
-export type PickModelProperties<T, K extends keyof T> = { [P in K]: T[P] | ModelProperties<T[P]> }
-
-// export type ModelProperties<T> = Pick<T, { [K in keyof T]: T[K] extends Function ? never : K }[keyof T]>
