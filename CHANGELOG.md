@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.0"></a>
+# [0.2.0](https://github.com/vitarn/tiamo/compare/v0.1.8...v0.2.0) (2018-03-31)
+
+
+### Features
+
+* **model:** add type ModelProperties<Model> ([#9](https://github.com/vitarn/tiamo/issues/9)) ([90cb0b7](https://github.com/vitarn/tiamo/commit/90cb0b7))
+
+
+
 <a name="0.1.8"></a>
 ## [0.1.8](https://github.com/vitarn/tiamo/compare/v0.1.7...v0.1.8) (2018-03-31)
 
