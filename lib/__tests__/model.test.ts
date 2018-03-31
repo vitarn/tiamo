@@ -159,7 +159,7 @@ describe('dynamodb', () => {
 
         it('return undefined if not found', async () => {
             let e = await Example.get({ id: '1' })
-            
+
             expect(e).toBeUndefined()
         })
     })
@@ -284,7 +284,7 @@ describe('dynamodb', () => {
             let m = await Example.findOne()
                 .index('uid-global')
                 .where('uid').eq('1')
-            
+
             expect(m.id).toBe('2')
 
             let n = await Example.findOne()
@@ -466,7 +466,11 @@ describe('dynamodb', () => {
             e = await Example.update({ id: '1' })
                 .add('roles', new Set(['vip']))
 
-            expect(e.roles).toEqual({ values: ['user', 'vip'], type: 'String' })
+            expect(e.roles).toEqual({
+                values: ['user', 'vip'],
+                type: 'String',
+                wrapperName: 'Set',
+            })
         })
 
         it('update id = 1 delete roles vip', async () => {
@@ -475,7 +479,11 @@ describe('dynamodb', () => {
             e = await Example.update({ id: '1' })
                 .delete('roles', new Set(['vip']))
 
-            expect(e.roles).toEqual({ values: ['user'], type: 'String' })
+            expect(e.roles).toEqual({
+                values: ['user'],
+                type: 'String',
+                wrapperName: 'Set',
+            })
         })
 
         it('update id = 1 quiet', async () => {

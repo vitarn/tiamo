@@ -125,8 +125,8 @@ export class Delete<M extends Model> {
 
         return this.options.Model[$delete](params)
             .then(res => {
-                if (res) onfulfilled(new this.options.Model(res) as M)
-                return onfulfilled(null)
+                if (res) return onfulfilled(new this.options.Model(res) as M)
+                return onfulfilled()
             }, onrejected)
     }
 

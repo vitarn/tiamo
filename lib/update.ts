@@ -187,7 +187,7 @@ export class Update<M extends Model> {
 
         return this.options.Model[$update](params)
             .then(res => {
-                if (res) onfulfilled(new this.options.Model(res) as M)
+                if (res) return onfulfilled(new this.options.Model(res) as M)
                 return onfulfilled()
             }, onrejected)
     }
