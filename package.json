@@ -6,13 +6,11 @@
   "author": "colder",
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
-    "test": "jest --runInBand",
-    "testing": "jest --runInBand --watch",
-    "coverage": "jest --coverage --runInBand",
-    "typecheck": "tsc --noEmit",
+    "pretest": "tsc --noEmit",
+    "test": "jest --coverage --maxWorkers=4",
+    "testing": "jest --watch",
     "release": "standard-version",
-    "prepack": "tsc --removeComments --inlineSourceMap false | echo shut up"
+    "prepack": "tsc --removeComments --inlineSourceMap false"
   },
   "dependencies": {
     "tdv": "^0.2.4"
@@ -26,6 +24,7 @@
     "jest": "^22.4.3",
     "joi": "12",
     "standard-version": "^4.3.0",
+    "test-listen": "^1.1.0",
     "ts-jest": "^22.4.2",
     "typescript": "^2.8.1"
   },
@@ -33,7 +32,7 @@
     "aws-sdk": "*"
   },
   "files": [
-    "**/**.js",
+    "**/*.js",
     "**/*.d.ts",
     "!__tests__"
   ],
