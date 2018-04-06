@@ -124,8 +124,10 @@ export const expression = (key: string) => <T>(op: string, op2?: string) => (val
             v(`${colon}_delete`, val)
             break
 
+        // only generate names. e.g. projection expression
         default:
-            throw new TypeError('Unknown expression operator')
+            // throw new TypeError('Unknown expression operator')
+            break
     }
 
     return data
