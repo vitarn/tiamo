@@ -37,7 +37,9 @@ export class Put<M extends Model> extends ConditionWriteOperate<M> {
         return this.options.Model[$put](params)
             .then(res => {
                 // res is old value or undefined. so we merge Item into res.
-                onfulfilled(new this.options.Model(Object.assign(res || {}, params.Item)) as M)
+                const props = Object.assign(res || {}, params.Item)
+
+                return onfulfilled(new this.options.Model(props) as M)
             }, onrejected)
     }
 }
