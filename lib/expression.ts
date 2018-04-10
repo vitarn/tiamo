@@ -2,7 +2,7 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 
 export const { createSet } = DocumentClient.prototype
 
-export const expression = (key: string) => <T>(op: string, op2?: string) => (val?: T) => {
+export const expression = (key: string) => <T>(op?: string, op2?: string) => (val?: T) => {
     const data: ExpressionData = {
         exprs: [],
         names: {},
@@ -107,25 +107,31 @@ export const expression = (key: string) => <T>(op: string, op2?: string) => (val
 
         case 'REMOVE':
             if (val) {
+                // REMOVE p[1], p[2]
                 let indexes = Array.isArray(val) ? <T[]>val : [val]
                 e(indexes.map(idx => `${sign}[${idx}]`).join(', '))
             } else {
-                e(`${sign}`)
+                // REMOVE p
+                e(sign)
             }
             break
 
+        // ADD p 1
         case 'ADD':
             e(`${sign} ${colon}_add`)
             v(`${colon}_add`, val)
             break
 
+        // DELETE p :l
         case 'DELETE':
             e(`${sign} ${colon}_delete`)
             v(`${colon}_delete`, val)
             break
 
+        // only generate names. e.g. projection expression
         default:
-            throw new TypeError('Unknown expression operator')
+            e(sign)
+            break
     }
 
     return data

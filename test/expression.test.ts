@@ -1,4 +1,4 @@
-import { expression } from '../expression'
+import { expression } from '../lib/expression'
 
 describe('expression', () => {
     it('prop = 1', () => {
@@ -211,7 +211,7 @@ describe('expression', () => {
 
         expect(expr.exprs).toEqual(['#prop :prop_add'])
         expect(expr.names).toEqual({ '#prop': 'prop' })
-        expect(expr.values).toEqual({ ':prop_add': { values: [1], type: 'Number' } })
+        expect(expr.values).toEqual({ ':prop_add': { values: [1], type: 'Number', wrapperName: 'Set' } })
     })
 
     it('DELETE prop :list', () => {
@@ -219,6 +219,14 @@ describe('expression', () => {
 
         expect(expr.exprs).toEqual(['#prop :prop_delete'])
         expect(expr.names).toEqual({ '#prop': 'prop' })
-        expect(expr.values).toEqual({ ':prop_delete': { values: [1, 2], type: 'Number' } })
+        expect(expr.values).toEqual({ ':prop_delete': { values: [1, 2], type: 'Number', wrapperName: 'Set' } })
+    })
+
+    it('ProjectionExpression', () => {
+        let expr = expression('prop.sub[1]')()()
+
+        expect(expr.exprs).toEqual(['#prop.#sub[1]'])
+        expect(expr.names).toEqual({ '#prop': 'prop', '#sub': 'sub' })
+        expect(expr.values).toEqual({})
     })
 })

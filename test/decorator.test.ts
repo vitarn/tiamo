@@ -1,5 +1,5 @@
-import { Model } from '../model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
+import { Model } from '../lib/model'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../lib/decorator'
 
 describe('decorator', () => {
     describe('tableName', () => {
@@ -53,9 +53,9 @@ describe('decorator', () => {
                 age: number
             }
 
-            expect(() => new Foo().attempt()).toThrow('"name" is required')
-            expect(() => new Foo({ name: 'a' }).attempt()).toThrow('"age" is required')
-            expect(() => new Foo({ name: 'a', age: 1 }).attempt()).not.toThrow()
+            expect(new Foo().validate().error.message).toMatch('"name" is required')
+            expect(new Foo({ name: 'a' }).validate().error.message).toMatch('"age" is required')
+            expect(new Foo({ name: 'a', age: 1 }).validate().error).toBeNull()
         })
 
         it('dont rewrite tdv metadata', () => {
@@ -69,7 +69,7 @@ describe('decorator', () => {
                 label: string
             }
 
-            expect(new Foo().attempt()).toEqual({ name: 'n', label: 'l' })
+            expect(new Foo({})).toEqual({ name: 'n', label: 'l' })
         })
     })
 
@@ -167,7 +167,7 @@ describe('decorator', () => {
                 age: number
             }
 
-            expect(() => new Foo().attempt()).not.toThrow()
+            expect(new Foo().validate().error).toBeNull()
         })
     })
 })

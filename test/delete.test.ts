@@ -1,5 +1,5 @@
-import { Delete } from '../delete'
-import { createSet } from '../expression'
+import { Delete } from '../lib/delete'
+import { createSet } from '../lib/expression'
 
 describe('Delete', () => {
     describe('toJSON', () => {

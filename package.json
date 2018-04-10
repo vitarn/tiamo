@@ -1,47 +1,47 @@
 {
   "name": "tiamo",
-  "version": "0.1.7",
+  "version": "0.3.1",
   "description": "Typescript inborn AWS DynamoDB ORM",
   "repository": "https://github.com/vitarn/tiamo",
   "author": "colder",
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
-    "test": "jest --runInBand",
-    "testing": "jest --runInBand --watch",
-    "coverage": "jest --coverage --runInBand",
-    "typecheck": "tsc --noEmit",
+    "pretest": "tsc -p tsconfig.prod.json --noEmit",
+    "test": "jest --coverage --maxWorkers=4",
+    "testing": "jest --watch",
     "release": "standard-version",
-    "prepack": "tsc --removeComments --inlineSourceMap false | echo shut up"
+    "prepack": "tsc -p tsconfig.prod.json"
   },
   "dependencies": {
-    "tdv": "^0.1.3"
+    "tdv": "^0.2.4"
   },
   "devDependencies": {
-    "@types/jest": "^22.2.0",
-    "@types/joi": "^13.0.6",
-    "@types/node": "^9.4.7",
-    "aws-sdk": "^2.211.1",
+    "@types/jest": "^22.2.2",
+    "@types/joi": "^13.0.7",
+    "@types/node": "^9.6.1",
+    "aws-sdk": "^2.218.1",
     "dynalite": "^1.2.0",
-    "jest": "^22.4.2",
-    "joi": "^13.1.2",
+    "jest": "^22.4.3",
+    "joi": "12",
     "standard-version": "^4.3.0",
+    "test-listen": "^1.1.0",
     "ts-jest": "^22.4.2",
-    "typescript": "^2.7.2"
+    "typescript": "^2.8.1"
   },
   "peerDependencies": {
     "aws-sdk": "*"
   },
   "files": [
-    "**/**.js",
+    "**/*.js",
     "**/*.d.ts",
-    "!__tests__"
+    "!coverage",
+    "!test"
   ],
   "jest": {
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(t)sx?$",
+    "testRegex": "/test/.*\\.(test)\\.(t)sx?$",
     "moduleFileExtensions": [
       "ts",
       "tsx",
@@ -49,6 +49,11 @@
       "jsx",
       "json",
       "node"
+    ]
+  },
+  "greenkeeper": {
+    "ignore": [
+      "joi"
     ]
   }
 }

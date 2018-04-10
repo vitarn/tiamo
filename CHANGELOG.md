@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.3.1"></a>
+## [0.3.1](https://github.com/vitarn/tiamo/compare/v0.3.0...v0.3.1) (2018-03-31)
+
+
+
+<a name="0.3.0"></a>
+# [0.3.0](https://github.com/vitarn/tiamo/compare/v0.2.0...v0.3.0) (2018-03-31)
+
+
+### Features
+
+* **model:** support parse from plain object include sub model instance ([cd2eb24](https://github.com/vitarn/tiamo/commit/cd2eb24))
+
+
+
+<a name="0.2.0"></a>
+# [0.2.0](https://github.com/vitarn/tiamo/compare/v0.1.8...v0.2.0) (2018-03-31)
+
+
+### Features
+
+* **model:** add type ModelProperties<Model> ([#9](https://github.com/vitarn/tiamo/issues/9)) ([90cb0b7](https://github.com/vitarn/tiamo/commit/90cb0b7))
+
+
+
+<a name="0.1.8"></a>
+## [0.1.8](https://github.com/vitarn/tiamo/compare/v0.1.7...v0.1.8) (2018-03-31)
+
+
+### Bug Fixes
+
+* don't resolve twice ([#7](https://github.com/vitarn/tiamo/issues/7)) ([3fecfbd](https://github.com/vitarn/tiamo/commit/3fecfbd))
+
+
+
 <a name="0.1.7"></a>
 ## [0.1.7](https://github.com/vitarn/tiamo/compare/v0.1.6...v0.1.7) (2018-03-29)
 

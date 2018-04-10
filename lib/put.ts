@@ -1,11 +1,11 @@
 import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { Model, $delete } from './model'
+import { Model, $put } from './model'
 import { expression, ExpressionLogic } from './expression'
 import { ConditionWriteOperate, OperateOptions } from './operate'
 
-export class Delete<M extends Model> extends ConditionWriteOperate<M> {
-    constructor(protected options = {} as DeleteOptions<M>) {
+export class Put<M extends Model> extends ConditionWriteOperate<M> {
+    constructor(protected options = {} as PutOptions<M>) {
         super(options)
 
         this.options.logic = this.options.logic || 'AND'
@@ -18,7 +18,7 @@ export class Delete<M extends Model> extends ConditionWriteOperate<M> {
         return { Delete: super.inspect() }
     }
 
-    toJSON(): Partial<DocumentClient.UpdateItemInput> {
+    toJSON(): Partial<DocumentClient.PutItemInput> {
         return super.toJSON()
     }
 
@@ -28,23 +28,25 @@ export class Delete<M extends Model> extends ConditionWriteOperate<M> {
     ) {
         const params = this.toJSON()
 
-        // Nothing to delete
-        if (!params.Key) {
-            onrejected(new Error('Delete key is empty'))
+        // Nothing to put
+        if (!params.Item) {
+            onrejected(new Error('Put item is empty'))
             return
         }
 
-        return this.options.Model[$delete](params)
+        return this.options.Model[$put](params)
             .then(res => {
-                if (res) return onfulfilled(new this.options.Model(res) as M)
-                return onfulfilled()
+                // res is old value or undefined. so we merge Item into res.
+                const props = Object.assign(res || {}, params.Item)
+
+                return onfulfilled(new this.options.Model(props) as M)
             }, onrejected)
     }
 }
 
 /* TYPES */
 
-export interface DeleteOptions<M extends Model> extends
+export interface PutOptions<M extends Model> extends
     Pick<OperateOptions<M>, 'Model' | 'logic' | 'leaf' | 'condExprs' | 'names' | 'values'>,
-    Partial<DocumentClient.DeleteItemInput> {
+    Partial<DocumentClient.PutItemInput> {
 }
