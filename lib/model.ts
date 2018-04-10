@@ -3,13 +3,14 @@ import { Schema, SchemaOptions, SchemaProperties } from 'tdv'
 import AWS, { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { dynamodbFor } from './metadata'
-import { BatchGet } from './batchGet'
-import { BatchWrite } from './batchWrite'
+import { Put } from './put'
 import { Get } from './get'
 import { Query } from './query'
 import { Scan } from './scan'
 import { Update } from './update'
 import { Delete } from './delete'
+import { BatchGet } from './batchGet'
+import { BatchWrite } from './batchWrite'
 import './Symbol.asyncIterator'
 
 const log = debug('model')
@@ -95,6 +96,13 @@ export class Model extends Schema {
      */
     static create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {}) {
         return (this.build(props, { convert: false }) as M).save(options)
+    }
+
+    /**
+     * Put item into db
+     */
+    static put<M extends Model>(this: ModelStatic<M>, Item: DocumentClient.PutItemInputAttributeMap) {
+        return new Put<M>({ Model: this, Item })
     }
 
     /**

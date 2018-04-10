@@ -1,9 +1,15 @@
+import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { Model } from './model'
 import { expression, ExpressionLogic } from './expression'
 
 export class Operate<M extends Model> {
     private static paramSet = new Set([
+        /** put */
+        'TableName', 'Item',
+        'ConditionExpression',
+        'ExpressionAttributeNames', 'ExpressionAttributeValues',
+        'ReturnValues', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics',
         /** get */
         'TableName', 'Key',
         'ProjectionExpression',
@@ -17,6 +23,7 @@ export class Operate<M extends Model> {
         'Select', 'Limit', 'ScanIndexForward', 'ExclusiveStartKey', 'ConsistentRead',
         'ReturnConsumedCapacity',
         /** scan */
+        // legacy AttributesToGet ScanFilter ConditionalOperator
         'TableName', 'IndexName',
         'FilterExpression', 'ProjectionExpression',
         'ExpressionAttributeNames', 'ExpressionAttributeValues',
@@ -34,11 +41,13 @@ export class Operate<M extends Model> {
         'ExpressionAttributeNames', 'ExpressionAttributeValues',
         'ReturnValues', 'ReturnConsumedCapacity', 'ReturnItemCollectionMetrics',
         /** batch get */
+        // legacy AttributesToGet
         'GetKeys',
         'ProjectionExpression', 'ExpressionAttributeNames',
         'ConsistentRead',
         'ReturnConsumedCapacity',
         /** batch write */
+        // legacy AttributesToGet
         'PutItems', 'DeleteKeys',
         'ReturnConsumedCapacity',
         'ReturnItemCollectionMetrics',
@@ -56,7 +65,17 @@ export class Operate<M extends Model> {
         return this
     }
 
-    inspect() {
+    index(name?: string) {
+        if (typeof name === 'string') {
+            this.options.IndexName = name
+        } else {
+            delete this.options.IndexName
+        }
+
+        return this
+    }
+
+    protected inspect() {
         return this.toJSON()
     }
 
@@ -101,12 +120,12 @@ export class Operate<M extends Model> {
                 json[key] = value
             }
         })
-        
+
         return json
     }
 
     async then<TRes>(
-        onfulfilled?: (value?: M) => TRes | PromiseLike<TRes>,
+        onfulfilled?: (value?: any) => TRes | PromiseLike<TRes> | undefined | null | void,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         return onfulfilled()
@@ -118,6 +137,9 @@ export class Operate<M extends Model> {
 }
 
 export class ReadOperate<M extends Model> extends Operate<M> {
+    /**
+     * Build ProjectionExpression
+     */
     select(...keys: (string | string[])[]) {
         const { options } = this
 
@@ -145,15 +167,157 @@ export class ReadOperate<M extends Model> extends Operate<M> {
     }
 }
 
+export class MultiReadOperate<M extends Model> extends ReadOperate<M> {
+    protected static fork(logic: ExpressionLogic) {
+        return new this({ logic, leaf: true })
+    }
+
+    filter<T extends this>(key: string) {
+        const { options } = this
+        const f = <V>(op: string, op2?: string) => (val?: V) => {
+            const { exprs, names, values } = expression(key)(op, op2)(val)
+            exprs.forEach(e => options.filterExprs.add(e))
+            Object.assign(options.names, names)
+            Object.assign(options.values, values)
+            return this as T
+        }
+        const compare = <V>(op2?) => ({
+            eq: f<V>('=', op2),
+            ne: f<V>('<>', op2),
+            lt: f<V>('<', op2),
+            lte: f<V>('<=', op2),
+            gt: f<V>('>', op2),
+            gte: f<V>('>=', op2),
+        })
+
+        return {
+            ...compare<number | string>(),
+            between: f<[number | string, number | string]>('BETWEEN'),
+            in: f<(number | string)[]>('IN'),
+            exists: f<never>('attribute_exists'),
+            not: {
+                exists: f<never>('attribute_not_exists'),
+            },
+            type: f<keyof DynamoDB.AttributeValue>('attribute_type'),
+            begins: f<string>('begins_with'),
+            contains: f<string>('contains'),
+            size: compare<number>('size'),
+        }
+    }
+
+    or(func: (operate: this) => any) {
+        return this.logicalClause('OR', func)
+    }
+
+    not(func: (operate: this) => any) {
+        return this.logicalClause('NOT', func)
+    }
+
+    private logicalClause<T extends typeof MultiReadOperate>(logic: ExpressionLogic, func: (operate) => any) {
+        const operate = (this.constructor as any as T).fork(logic)
+        func(operate)
+        const json = operate.toJSON() as DocumentClient.QueryInput
+        const { keyExprs, filterExprs, names, values } = this.options
+
+        if (json.KeyConditionExpression) keyExprs.add(json.KeyConditionExpression)
+        if (json.FilterExpression) filterExprs.add(json.FilterExpression)
+        Object.assign(names, operate.options.names)
+        Object.assign(values, operate.options.values)
+
+        return this
+    }
+
+    limit(value: number) {
+        if (!this.options.one && value > 0) this.options.Limit = value
+
+        return this
+    }
+}
+
 export class WriteOperate<M extends Model> extends Operate<M> {
+    quiet() {
+        super.quiet()
+
+        this.options.ReturnItemCollectionMetrics = 'NONE'
+
+        return this
+    }
+}
+
+export class ConditionWriteOperate<M extends Model> extends WriteOperate<M> {
+    where<T extends this>(key: string) {
+        const { options } = this
+        const f = <V>(op: string, op2?: string) => (val?: V) => {
+            const { exprs, names, values } = expression(key)(op, op2)(val)
+            exprs.forEach(e => options.condExprs.add(e))
+            Object.assign(options.names, names)
+            Object.assign(options.values, values)
+            return this as T
+        }
+        const compare = <V>(op2?) => ({
+            eq: f<V>('=', op2),
+            ne: f<V>('<>', op2),
+            lt: f<V>('<', op2),
+            lte: f<V>('<=', op2),
+            gt: f<V>('>', op2),
+            gte: f<V>('>=', op2),
+        })
+
+        return {
+            ...compare<number | string>(),
+            between: f<[string, string]>('BETWEEN'),
+            in: f<string[]>('IN'),
+            exists: f<never>('attribute_exists'),
+            not: {
+                exists: f<never>('attribute_not_exists'),
+            },
+            type: f<keyof DynamoDB.AttributeValue>('attribute_type'),
+            begins: f<string>('begins_with'),
+            contains: f<string>('contains'),
+            size: compare<number>('size'),
+        }
+    }
+
+    or(func: (operate: this) => any) {
+        return this.logicalClause('OR', func)
+    }
+
+    not(func: (operate: this) => any) {
+        return this.logicalClause('NOT', func)
+    }
+
+    private logicalClause<T extends typeof ConditionWriteOperate>(logic: ExpressionLogic, func: (operate) => any) {
+        const operate = new (this.constructor as any as T)<M>({ logic, leaf: true })
+        func(operate)
+        const json = operate.toJSON() as DocumentClient.UpdateItemInput
+        const { condExprs, names, values } = this.options
+
+        if (json.ConditionExpression) condExprs.add(json.ConditionExpression)
+        Object.assign(names, operate.options.names)
+        Object.assign(values, operate.options.values)
+
+        return this
+    }
+
+    quiet() {
+        super.quiet()
+
+        this.options.ReturnValues = 'NONE'
+
+        return this
+    }
 }
 
 /* TYPES */
 
-export interface OperateOptions<M extends Model> extends Partial<DocumentClient.QueryInput>, Partial<DocumentClient.UpdateItemInput> {
+export interface OperateOptions<M extends Model> extends
+    Partial<DocumentClient.PutItemInput>,
+    Partial<DocumentClient.QueryInput>,
+    Partial<DocumentClient.UpdateItemInput> {
     Model?: M['constructor']
     logic?: ExpressionLogic
     leaf?: boolean
+    one?: boolean
 
     /** KeyConditionExpression in query */
     keyExprs?: Set<string>
@@ -175,4 +339,11 @@ export interface OperateOptions<M extends Model> extends Partial<DocumentClient.
     names?: { [name: string]: string }
     /** ExpressionAttributeValues in query scan update put delete */
     values?: { [name: string]: any }
+
+    /** RequestItems[TableName].Keys in batchGet */
+    GetKeys?: DocumentClient.KeyList
+    /** RequestItems[TableName][].PutRequest.Item in batchWrite */
+    PutItems?: DocumentClient.PutItemInputAttributeMap[]
+    /** RequestItems[TableName][].DeleteRequest.Key in batchWrite */
+    DeleteKeys?: DocumentClient.KeyList
 }

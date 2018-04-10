@@ -2,19 +2,11 @@ import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { Model, $query } from './model'
 import { expression, ExpressionLogic } from './expression'
+import { MultiReadOperate, OperateOptions } from './operate'
 
-export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<M> {
-    static PARAM_KEYS = `
-        TableName IndexName
-        KeyConditionExpression FilterExpression ProjectionExpression
-        ExpressionAttributeNames ExpressionAttributeValues
-        Select Limit ConsistentRead
-        ScanIndexForward ExclusiveStartKey
-        ReturnConsumedCapacity
-    `.split(/\s+/)
-
-    constructor(private options = {} as QueryOptions<M>) {
-        this.options = options
+export class Query<M extends Model, R extends M | M[]> extends MultiReadOperate<M> implements AsyncIterable<M> {
+    constructor(protected options = {} as QueryOptions<M>) {
+        super(options)
 
         this.options.logic = this.options.logic || 'AND'
         this.options.keyExprs = this.options.keyExprs || new Set()
@@ -22,17 +14,19 @@ export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<
         this.options.projExprs = this.options.projExprs || new Set()
         this.options.names = this.options.names || {}
         this.options.values = this.options.values || {}
+
+        if (this.options.one) this.options.Limit = 1
     }
 
-    where(key: string) {
+    where<T extends this>(key: string) {
         const { options } = this
-        const f = <T>(op: string, op2?: string) => (val?: T) => {
+        const f = <V>(op: string, op2?: string) => (val?: V) => {
             const { exprs, names, values } = expression(key)(op, op2)(val)
             exprs.forEach(e => options.keyExprs.add(e))
             Object.assign(options.names, names)
             Object.assign(options.values, values)
             // FIX: The inferred type of 'where' references an inaccessible 'this' type. A type annotation is necessary.
-            return this as Query<M, R>
+            return this as T
         }
 
         return {
@@ -41,89 +35,9 @@ export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<
             lte: f('<='),
             gt: f('>'),
             gte: f('>='),
-            between: f<[any, any]>('BETWEEN'),
+            between: f<[string, string]>('BETWEEN'),
             begins: f<string>('begins_with'),
         }
-    }
-
-    filter(key: string) {
-        const { options } = this
-        const f = <T>(op: string, op2?: string) => (val?: T) => {
-            const { exprs, names, values } = expression(key)(op, op2)(val)
-            exprs.forEach(e => options.filterExprs.add(e))
-            Object.assign(options.names, names)
-            Object.assign(options.values, values)
-            return this as Query<M, R>
-        }
-        const compare = (op2?) => ({
-            eq: f('=', op2),
-            ne: f('<>', op2),
-            lt: f('<', op2),
-            lte: f('<=', op2),
-            gt: f('>', op2),
-            gte: f('>=', op2),
-        })
-
-        return {
-            ...compare(),
-            between: f<[any, any]>('BETWEEN'),
-            in: f<any[]>('IN'),
-            exists: f<never>('attribute_exists'),
-            not: {
-                exists: f<never>('attribute_not_exists'),
-            },
-            type: f<keyof DynamoDB.AttributeValue>('attribute_type'),
-            begins: f<string>('begins_with'),
-            contains: f('contains'),
-            size: compare('size'),
-        }
-    }
-
-    or(func: (query: this) => any) {
-        return this.logicalClause('OR', func)
-    }
-
-    not(func: (query: this) => any) {
-        return this.logicalClause('NOT', func)
-    }
-
-    private logicalClause(logic: ExpressionLogic, func: (query) => any) {
-        const query = new Query({ logic, leaf: true })
-        func(query)
-        const json = query.toJSON()
-        const { keyExprs, filterExprs, names, values } = this.options
-
-        if (json.KeyConditionExpression) keyExprs.add(json.KeyConditionExpression)
-        if (json.FilterExpression) filterExprs.add(json.FilterExpression)
-        Object.assign(names, query.options.names)
-        Object.assign(values, query.options.values)
-
-        return this
-    }
-
-    /**
-     * Build ProjectionExpression
-     */
-    select(...keys: (string | string[])[]) {
-        const { options } = this
-
-        keys.reduce<string[]>((a, v) => typeof v === 'string' ? a.concat(v) : a.concat(...v), [])
-            .filter(key => typeof key === 'string')
-            .map(key => key.split(/\s+/))
-            .reduce((a, v) => a.concat(v), [])
-            .forEach(key => {
-                const { exprs, names } = expression(key)()()
-                exprs.forEach(e => options.projExprs.add(e))
-                Object.assign(options.names, names)
-            })
-
-        return this
-    }
-
-    limit(val: number) {
-        if (!this.options.one && val > 0) this.options.Limit = val
-
-        return this
     }
 
     one() {
@@ -151,61 +65,12 @@ export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<
         return this
     }
 
-    consistent(value = true) {
-        if (!!value === true) {
-            this.options.ConsistentRead = true
-        } else {
-            delete this.options.ConsistentRead
-        }
-
-        return this
-    }
-
-    index(name?: string) {
-        if (typeof name === 'string') {
-            this.options.IndexName = name
-        } else {
-            delete this.options.IndexName
-        }
-
-        return this
-    }
-
     inspect() {
-        return { Query: this.toJSON() }
+        return { Query: super.inspect() }
     }
 
-    toJSON(): Partial<DocumentClient.QueryInput> {
-        const { options } = this
-        const { logic, leaf, keyExprs, filterExprs, projExprs, names, values } = options
-
-        if (logic === 'NOT') {
-            if (keyExprs.size) options.KeyConditionExpression = `NOT ${Array.from(keyExprs).join(' AND ')}`
-            if (filterExprs.size) options.FilterExpression = `NOT ${Array.from(filterExprs).join(' AND ')}`
-        } else {
-            if (keyExprs.size) options.KeyConditionExpression = `${Array.from(keyExprs).join(` ${logic} `)}`
-            if (filterExprs.size) options.FilterExpression = `${Array.from(filterExprs).join(` ${logic} `)}`
-        }
-
-        if (leaf) {
-            if (options.KeyConditionExpression) options.KeyConditionExpression = `(${options.KeyConditionExpression})`
-            if (options.FilterExpression) options.FilterExpression = `(${options.FilterExpression})`
-        }
-
-        if (projExprs.size) options.ProjectionExpression = Array.from(projExprs).join(', ')
-
-        if (Object.keys(names).length) options.ExpressionAttributeNames = names
-        if (Object.keys(values).length) options.ExpressionAttributeValues = values
-
-        if (options.one && !options.Limit) options.Limit = 1
-
-        return (this.constructor as typeof Query).PARAM_KEYS.reduce((json, key) => {
-            const value = options[key]
-            if (typeof value !== 'undefined') {
-                json[key] = value
-            }
-            return json
-        }, {})
+    toJSON() {
+        return super.toJSON() as DocumentClient.QueryInput
     }
 
     /**
@@ -246,10 +111,6 @@ export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<
         }
     }
 
-    catch(onrejected?: (reason: any) => PromiseLike<never>) {
-        return this.then(null, onrejected)
-    }
-
     [Symbol.asyncIterator] = async function* (this: Query<M, R>) {
         const { Model } = this.options
 
@@ -264,14 +125,6 @@ export class Query<M extends Model, R extends M | M[]> implements AsyncIterable<
 
 /* TYPES */
 
-export interface QueryOptions<M extends Model> extends Partial<DocumentClient.QueryInput> {
-    Model?: M['constructor']
+export interface QueryOptions<M extends Model> extends Pick<OperateOptions<M>, 'Model' | 'logic' | 'leaf' | 'keyExprs' | 'filterExprs' | 'projExprs' | 'names' | 'values'>, Partial<DocumentClient.QueryInput> {
     one?: boolean
-    logic?: ExpressionLogic
-    leaf?: boolean
-    keyExprs?: Set<string>
-    filterExprs?: Set<string>
-    projExprs?: Set<string>
-    names?: { [name: string]: string }
-    values?: { [name: string]: any }
 }

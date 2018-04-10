@@ -2,21 +2,21 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { Model, $batchWrite } from './model'
 import { expression } from './expression'
 import { BatchGet } from './batchGet'
+import { WriteOperate, OperateOptions } from './operate'
 
-export class BatchWrite<M extends Model> implements AsyncIterable<M> {
+export class BatchWrite<M extends Model> extends WriteOperate<M> implements AsyncIterable<M> {
     // legacy: AttributesToGet
-    static PARAM_KEYS = `
-        PutItems DeleteKeys
-        ReturnConsumedCapacity
-        ReturnItemCollectionMetrics
-    `.split(/\s+/)
+    // static PARAM_KEYS = `
+    //     PutItems DeleteKeys
+    //     ReturnConsumedCapacity
+    //     ReturnItemCollectionMetrics
+    // `.split(/\s+/)
 
-    constructor(private options = {} as BatchWriteOptions<M>) {
-        options = { ...options }
-        this.options = options
+    constructor(protected options = {} as BatchWriteOptions<M>) {
+        super(options)
 
-        options.PutItems = options.PutItems || []
-        options.DeleteKeys = options.DeleteKeys || []
+        this.options.PutItems = this.options.PutItems || []
+        this.options.DeleteKeys = this.options.DeleteKeys || []
     }
 
     put(...PutItems: DocumentClient.PutItemInputAttributeMap[]) {
@@ -37,20 +37,14 @@ export class BatchWrite<M extends Model> implements AsyncIterable<M> {
         return new BatchGet<M>({ Model, GetKeys, batchWrite: this })
     }
 
-    quiet() {
-        this.options.ReturnConsumedCapacity = 'NONE'
-        this.options.ReturnItemCollectionMetrics = 'NONE'
-
-        return this
-    }
-
     inspect() {
         return { BatchWrite: this.toJSON() }
     }
 
     toJSON() {
+        const { PutItems = [], DeleteKeys = [], ...other } = super.toJSON() as Pick<BatchWriteOptions<M>, 'PutItems' | 'DeleteKeys' | 'ReturnConsumedCapacity' | 'ReturnItemCollectionMetrics'>
         const { options } = this
-        const { Model, PutItems, DeleteKeys, ...other } = options
+        const { Model } = options
         const { tableName } = Model
         const json = {
             RequestItems: {
@@ -83,10 +77,6 @@ export class BatchWrite<M extends Model> implements AsyncIterable<M> {
         }
     }
 
-    catch(onrejected?: (reason: any) => PromiseLike<never>) {
-        return this.then(null, onrejected)
-    }
-
     [Symbol.asyncIterator] = async function* (this: BatchWrite<M>) {
         for await (let res of Model[$batchWrite](this.toJSON())) {
             yield res
@@ -96,8 +86,7 @@ export class BatchWrite<M extends Model> implements AsyncIterable<M> {
 
 /* TYPES */
 
-export interface BatchWriteOptions<M extends Model> extends Pick<DocumentClient.BatchWriteItemInput, 'ReturnConsumedCapacity' | 'ReturnItemCollectionMetrics'> {
-    Model?: M['constructor']
-    PutItems?: DocumentClient.PutItemInputAttributeMap[]
-    DeleteKeys?: DocumentClient.KeyList
+export interface BatchWriteOptions<M extends Model> extends
+    Pick<OperateOptions<M>, 'Model' | 'PutItems' | 'DeleteKeys'>,
+    Pick<DocumentClient.BatchWriteItemInput, 'ReturnConsumedCapacity' | 'ReturnItemCollectionMetrics'> {
 }

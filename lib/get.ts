@@ -20,7 +20,11 @@ export class Get<M extends Model> extends ReadOperate<M> {
     }
 
     inspect() {
-        return { Get: super.toJSON() }
+        return { Get: super.inspect() }
+    }
+
+    toJSON() {
+        return super.toJSON() as DocumentClient.GetItemInput
     }
 
     then<TRes>(
@@ -42,6 +46,5 @@ export class Get<M extends Model> extends ReadOperate<M> {
 
 /* TYPES */
 
-export interface GetOptions<M extends Model> extends Pick<OperateOptions<M>, 'projExprs' | 'names'>, Partial<DocumentClient.GetItemInput> {
-    Model?: M['constructor']
+export interface GetOptions<M extends Model> extends Pick<OperateOptions<M>, 'Model' | 'projExprs' | 'names'>, Partial<DocumentClient.GetItemInput> {
 }
