@@ -1,6 +1,6 @@
 import dynalite from 'dynalite'
 import listen from 'test-listen'
-import { Model, $batchGet, $batchWrite, $put, $get } from '../model'
+import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../model'
 import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
 
 const { AWS } = Model
@@ -349,7 +349,6 @@ describe('Model', () => {
         })
 
         describe('query', () => {
-            // @tableName
             class Example extends Model {
                 @hashKey id: string
 
@@ -483,6 +482,75 @@ describe('Model', () => {
                     .where('id').eq('1')
 
                 expect(m.id).toBe('1')
+            })
+        })
+
+        describe('scan', () => {
+            class ScanExample extends Model {
+                @hashKey id: number
+
+                @optional data?: any
+            }
+
+            const ids = Array(5).fill(0).map((_, i) => i + 1)
+            const data = {
+                a: '0'.repeat(399).repeat(1024), // // 399KB
+            }
+
+            beforeEach(async () => {
+                await Model.ddb.createTable({
+                    TableName: 'ScanExample',
+                    AttributeDefinitions: [{
+                        AttributeName: 'id',
+                        AttributeType: 'N',
+                    }],
+                    KeySchema: [{
+                        AttributeName: 'id',
+                        KeyType: 'HASH',
+                    }],
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1000,
+                        WriteCapacityUnits: 1000,
+                    },
+                }).promise()
+
+                await Promise.all(ids.map(id => ScanExample.create({ id, data })))
+            })
+
+            it('$scan is a async generator and multi times yield', async () => {
+                let i = 0, a = []
+                for await (let r of ScanExample[$scan]({})) {
+                    i++
+                    a = a.concat(r)
+                }
+
+                expect(i).toBe(2)
+                expect(a.length).toBe(5)
+            })
+
+            it('scan full table', async () => {
+                let scanIds = []
+                for await (let r of ScanExample.scan()) {
+                    scanIds.push(r.id)
+                }
+
+                expect(scanIds.sort()).toEqual(ids)
+
+                scanIds = (await ScanExample.scan()).map(e => e.id).sort()
+
+                expect(scanIds.sort()).toEqual(ids)
+            })
+
+            it('scan by id > 3', async () => {
+                let scanIds = (await ScanExample.scan().filter('id').gt(3)).map(e => e.id).sort()
+
+                expect(scanIds.sort()).toEqual([4, 5])
+            })
+
+            it('scan count', async () => {
+                let c = await ScanExample.scan().filter('id').gt(3).count()
+
+                expect(c).toBe(2)
             })
         })
 
@@ -711,7 +779,7 @@ describe('Model', () => {
             })
         })
 
-        describe('remove', () => {
+        describe('delete', () => {
             class Example extends Model {
                 @hashKey id: string
 

@@ -4,7 +4,7 @@ import { Model, $query } from './model'
 import { expression, ExpressionLogic } from './expression'
 
 export class Query<M extends Model, R extends number | M | M[]> {
-    static QUERY_KEYS = `
+    static PARAM_KEYS = `
         TableName IndexName
         KeyConditionExpression FilterExpression ProjectionExpression
         ExpressionAttributeNames ExpressionAttributeValues
@@ -126,7 +126,7 @@ export class Query<M extends Model, R extends number | M | M[]> {
 
         if (options.one && !options.Limit) options.Limit = 1
 
-        return (this.constructor as typeof Query).QUERY_KEYS.reduce((json, key) => {
+        return (this.constructor as typeof Query).PARAM_KEYS.reduce((json, key) => {
             if (options[key]) {
                 json[key] = options[key]
             }

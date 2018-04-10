@@ -7,6 +7,7 @@ import { BatchGet } from './batchGet'
 import { BatchWrite } from './batchWrite'
 import { Get } from './get'
 import { Query } from './query'
+import { Scan } from './scan'
 import { Update } from './update'
 import { Delete } from './delete'
 import './Symbol.asyncIterator'
@@ -117,7 +118,7 @@ export class Model extends Schema {
      * Scan items
      */
     static scan<M extends Model>(this: ModelStatic<M>) {
-        throw Error('Not implement')
+        return new Scan<M>({ Model: this })
     }
 
     /**
@@ -277,12 +278,38 @@ export class Model extends Schema {
 
         return this.client.query(p).promise().then(res => {
             if (res.ConsumedCapacity) log('⇣ [QUERY] consumed capacity: ', res.ConsumedCapacity)
+
             if (p.Select === 'COUNT') {
                 return res.Count
             } else {
                 return res.Items
             }
         })
+    }
+
+    static [$scan] = async function* (this: ModelStatic<Model>, params: Partial<DocumentClient.ScanInput>) {
+        let ExclusiveStartKey
+        let { ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY, ...other } = params
+        let i = 0
+
+        do {
+            i++
+            const p = { ...other, ExclusiveStartKey, ReturnConsumedCapacity } as DocumentClient.ScanInput
+            p.TableName = p.TableName || this.tableName
+
+            log('⇡ [SCAN]#%d request params: %o', i, p)
+
+            let res = await this.client.scan(p).promise()
+            if (res.ConsumedCapacity) log('⇣ [SCAN]#%d consumed capacity:', i, res.ConsumedCapacity)
+
+            if (p.Select === 'COUNT') {
+                yield res.Count
+            } else {
+                yield res.Items
+            }
+
+            ExclusiveStartKey = res.LastEvaluatedKey
+        } while (i == 0 || ExclusiveStartKey)
     }
 
     static [$update](params: Partial<DocumentClient.UpdateItemInput>) {
