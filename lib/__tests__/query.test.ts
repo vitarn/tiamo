@@ -6,15 +6,23 @@ describe('Query', () => {
     describe('toJSON', () => {
         it('support cond set unset del', () => {
             let q = new Query({ TableName: 'users' })
+                .index('id-global-index')
                 .where('id').eq('123')
                 .filter('name').eq('abc')
                 .filter('age').gte(14)
                 .filter('profile.tags[0]').eq('cool')
+                .select('age')
+                .limit(10)
+                .sort(-1)
 
             expect(q.toJSON()).toEqual({
                 TableName: 'users',
-                FilterExpression: '#name = :name AND #age >= :age AND #profile.#tags[0] = :profile_tags_0',
+                IndexName: 'id-global-index',
+                Limit: 10,
+                ScanIndexForward: false,
                 KeyConditionExpression: '#id = :id',
+                FilterExpression: '#name = :name AND #age >= :age AND #profile.#tags[0] = :profile_tags_0',
+                ProjectionExpression: '#age',
                 ExpressionAttributeNames: {
                     '#id': 'id',
                     '#name': 'name',
@@ -93,6 +101,39 @@ describe('Query', () => {
             expect(o.KeyConditionExpression).toBe('#id = :id AND (NOT #age >= :age AND (#sex = :sex OR #ban = :ban))')
             expect(o.ExpressionAttributeNames).toEqual({ '#age': 'age', '#ban': 'ban', '#id': 'id', '#sex': 'sex' })
             expect(o.ExpressionAttributeValues).toEqual({ ':age': 18, ':ban': true, ':id': 1, ':sex': 'boy' })
+        })
+    })
+
+    describe('options', () => {
+        it('limit', () => {
+            expect(new Query().limit(2).toJSON().Limit).toBe(2)
+        })
+
+        it('one', () => {
+            expect(new Query().one().toJSON().Limit).toBe(1)
+        })
+
+        it('sort', () => {
+            let sort = (order?) => new Query().sort(order).toJSON().ScanIndexForward
+
+            expect(sort()).toBeUndefined()
+            expect(sort(true)).toBeUndefined()
+            expect(sort(1)).toBeUndefined()
+            expect(sort('asc')).toBeUndefined()
+            expect(sort(false)).toBe(false)
+            expect(sort(-1)).toBe(false)
+            expect(sort('desc')).toBe(false)
+        })
+
+        it('consistent', () => {
+            expect(new Query().consistent().toJSON().ConsistentRead).toBe(true)
+            expect(new Query().consistent(true).toJSON().ConsistentRead).toBe(true)
+            expect(new Query().consistent(false).toJSON().ConsistentRead).toBeUndefined()
+        })
+
+        it('index', () => {
+            expect(new Query().index('idx').toJSON().IndexName).toBe('idx')
+            expect(new Query().index().toJSON().IndexName).toBeUndefined()
         })
     })
 })
