@@ -3,9 +3,13 @@ import { Schema, SchemaOptions, SchemaProperties } from 'tdv'
 import AWS, { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { dynamodbFor } from './metadata'
+import { BatchGet } from './batchGet'
+import { BatchWrite } from './batchWrite'
+import { Get } from './get'
 import { Query } from './query'
 import { Update } from './update'
 import { Delete } from './delete'
+import './Symbol.asyncIterator'
 
 const log = debug('model')
 
@@ -15,6 +19,12 @@ export const $query = Symbol.for('query')
 export const $scan = Symbol.for('scan')
 export const $update = Symbol.for('update')
 export const $delete = Symbol.for('delete')
+export const $batchGet = Symbol.for('batchGet')
+export const $batchWrite = Symbol.for('batchWrite')
+
+const { NODE_ENV } = process.env
+const RETURN_CONSUMED_CAPACITY = NODE_ENV === 'production' ? 'NONE' : 'TOTAL'
+const RETURN_ITEM_COLLECTION_METRICS = NODE_ENV === 'production' ? 'NONE' : 'SIZE'
 
 export class Model extends Schema {
     /**
@@ -22,23 +32,25 @@ export class Model extends Schema {
      */
     static AWS = AWS
 
-    protected static _documentClient: DocumentClient
-    /**
-     * AWS DynamoDB DocumentClient instance
-     */
-    static get client() {
-        return this._documentClient
-            || (this._documentClient = new DocumentClient())
-    }
-
-    protected static _ddb: DynamoDB
+    // protected static _ddb: DynamoDB
     /**
      * AWS DynamoDB instance
      */
-    static get ddb() {
-        return this._ddb
-            || (this._ddb = new DynamoDB())
-    }
+    // static get ddb() {
+    //     return this._ddb
+    //         || (this._ddb = new DynamoDB())
+    // }
+    static ddb = new AWS.DynamoDB()
+
+    // protected static _documentClient: DocumentClient
+    /**
+     * AWS DynamoDB DocumentClient instance
+     */
+    // static get client() {
+    //     return this._documentClient
+    //         || (this._documentClient = new DocumentClient())
+    // }
+    static client = new DocumentClient()
 
     /**
      * Table name store in metadata
@@ -85,29 +97,19 @@ export class Model extends Schema {
     }
 
     /**
-     * Get item by Key
+     * Get item by key
      */
     static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
-        return this[$get]({ Key }).then(Item => Item && new this(Item) as M)
+        return new Get<M>({ Model: this, Key }) // .then(Item => Item && new this(Item) as M)
     }
 
     /**
-     * Find items by Key
+     * Query items by key
      */
-    static find<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
+    static query<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
         return Object.keys(Key).reduce(
             (q, k) => q.where(k).eq(Key[k]),
             new Query<M, M[]>({ Model: this }),
-        )
-    }
-
-    /**
-     * Find one item by Key
-     */
-    static findOne<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key = {}) {
-        return Object.keys(Key).reduce(
-            (q, k) => q.where(k).eq(Key[k]),
-            new Query<M, M>({ Model: this, one: true }),
         )
     }
 
@@ -119,25 +121,87 @@ export class Model extends Schema {
     }
 
     /**
-     * Update item by Key
+     * Update item by key
      */
     static update<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return new Update<M>({ Model: this, Key })
     }
 
     /**
-     * Remove item by Key
+     * Delete item by key
      */
-    static remove<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
+    static delete<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
         return new Delete<M>({ Model: this, Key })
+    }
+
+    static batch<M extends Model>(this: ModelStatic<M>) {
+        const self = this
+
+        return {
+            get(...GetKeys: DocumentClient.KeyList) {
+                return new BatchGet<M>({ Model: self, GetKeys })
+            },
+            put(...PutItems: DocumentClient.PutItemInputAttributeMap[]) {
+                return new BatchWrite<M>({ Model: self, PutItems })
+            },
+            delete(...DeleteKeys: DocumentClient.KeyList) {
+                return new BatchWrite<M>({ Model: self, DeleteKeys })
+            },
+        }
+    }
+
+    static [$batchGet] = async function* (this: ModelStatic<Model>, params: DocumentClient.BatchGetItemInput) {
+        let { RequestItems, ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY } = params
+        let i = 0
+
+        do {
+            i++
+            const p = { RequestItems, ReturnConsumedCapacity }
+
+            log('⇡ [BATCHGET]#%d request params: %o', i, Object.keys(p.RequestItems).reduce((a, k) => {
+                a[k] = p.RequestItems[k].Keys.length
+                return a
+            }, {}))
+
+            let res = await this.client.batchGet(p).promise()
+            if (res.ConsumedCapacity) log('⇣ [BATCHGET]#%d consumed capacity:', i, res.ConsumedCapacity)
+
+            yield res.Responses
+
+            RequestItems = res.UnprocessedKeys
+        } while (Object.keys(RequestItems).length) // last time is {}
+    }
+
+    static [$batchWrite] = async function* (this: ModelStatic<Model>, params: DocumentClient.BatchWriteItemInput) {
+        let {
+            RequestItems,
+            ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY,
+            ReturnItemCollectionMetrics = RETURN_ITEM_COLLECTION_METRICS,
+        } = params
+        let i = 0
+
+        do {
+            i++
+            const p = { RequestItems, ReturnConsumedCapacity, ReturnItemCollectionMetrics }
+
+            log('⇡ [BATCHWRITE][%d] request...', i)
+
+            let res = await this.client.batchWrite(p).promise()
+            if (res.ConsumedCapacity) log('⇣ [BATCHWRITE][%d] consumed capacity:', i, res.ConsumedCapacity)
+            if (res.ItemCollectionMetrics) log('⇣ [BATCHWRITE][%d] item collection metrics:', i, res.ItemCollectionMetrics)
+
+            yield // what yield from batchWrite?
+
+            RequestItems = res.UnprocessedItems
+        } while (Object.keys(RequestItems).length) // last time is {}
     }
 
     static [$put](params: Partial<DocumentClient.PutItemInput>) {
         const p = { ...params } as DocumentClient.PutItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
-        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
+        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || RETURN_ITEM_COLLECTION_METRICS
 
         log('⇡ [PUT] request params:', p)
 
@@ -151,7 +215,7 @@ export class Model extends Schema {
     static [$get](params: Partial<DocumentClient.GetItemInput>) {
         const p = { ...params } as DocumentClient.GetItemInput
         p.TableName = p.TableName || this.tableName
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
 
         log('⇡ [GET] request params:', p)
 
@@ -164,13 +228,17 @@ export class Model extends Schema {
     static [$query](params: Partial<DocumentClient.QueryInput>) {
         const p = { ...params } as DocumentClient.QueryInput
         p.TableName = p.TableName || this.tableName
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
 
         log('⇡ [QUERY] request params:', p)
 
         return this.client.query(p).promise().then(res => {
             if (res.ConsumedCapacity) log('⇣ [QUERY] consumed capacity: ', res.ConsumedCapacity)
-            return res.Items
+            if (p.Select === 'COUNT') {
+                return res.Count
+            } else {
+                return res.Items
+            }
         })
     }
 
@@ -178,8 +246,8 @@ export class Model extends Schema {
         const p = { ...params } as DocumentClient.UpdateItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_NEW'
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
-        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
+        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || RETURN_ITEM_COLLECTION_METRICS
 
         log('⇡ [UPDATE] request params:', p)
         return this.client.update(p).promise().then(res => {
@@ -193,8 +261,8 @@ export class Model extends Schema {
         const p = { ...params } as DocumentClient.DeleteItemInput
         p.TableName = p.TableName || this.tableName
         p.ReturnValues = p.ReturnValues || 'ALL_OLD'
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = 'TOTAL'
-        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || 'SIZE'
+        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
+        p.ReturnItemCollectionMetrics = p.ReturnItemCollectionMetrics || RETURN_ITEM_COLLECTION_METRICS
 
         log('⇡ [DELETE] request params:', p)
 
@@ -226,9 +294,9 @@ export class Model extends Schema {
     }
 
     /**
-     * Remove from db by Key
+     * Delete from db by key
      */
-    remove(options?) {
+    delete(options?) {
         const { hashKey, rangeKey } = this.constructor
         const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
         if (rangeKey) Key[rangeKey] = this[rangeKey]

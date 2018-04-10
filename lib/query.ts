@@ -3,7 +3,7 @@ import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { Model, $query } from './model'
 import { expression, ExpressionLogic } from './expression'
 
-export class Query<M extends Model, R extends M | M[]> {
+export class Query<M extends Model, R extends number | M | M[]> {
     static QUERY_KEYS = `
         TableName IndexName
         KeyConditionExpression FilterExpression ProjectionExpression
@@ -134,35 +134,43 @@ export class Query<M extends Model, R extends M | M[]> {
         }, {})
     }
 
-    get count() {
-        this.options.Select = 'COUNT'
-        return this
+    /**
+     * count of result
+     * 
+     * AWS param: Select = 'COUNT'
+     * 
+     * @return number
+     */
+    count() {
+        if (!this.options.one) this.options.Select = 'COUNT'
+        return this as Query<M, number>
     }
 
     limit(val: number) {
-        this.options.Limit = val
+        if (!this.options.one && val > 0) this.options.Limit = val
+        return this // as Query<M, M[]>
+    }
+
+    one() {
+        this.options.one = true
+        this.options.Limit = 1
+        return this as Query<M, M>
+    }
+
+    /**
+     * sort result
+     * 
+     * * forward: true | 1 | 'asc'
+     * * backward: false | -1 | 'desc'
+     * 
+     * AWS param: ScanIndexForward = true
+     */
+    sort(order: boolean | 1 | -1 | 'asc' | 'desc') {
+        this.options.ScanIndexForward = order === 'asc' || Number(order) > 0
         return this
     }
 
-    // get asc() {
-    //     this.options.ScanIndexForward = true
-    //     return this
-    // }
-
-    get desc() {
-        this.options.ScanIndexForward = false
-        return this
-    }
-
-    // sort(val) {
-    //     if (val === 1 || val === true) {
-    //         this.options.ScanIndexForward = true
-    //     } else if (val === -1 || val === false) {
-    //         this.options.ScanIndexForward = false
-    //     }
-    // }
-
-    get consistent() {
+    consistent() {
         this.options.ConsistentRead = true
         return this
     }
@@ -180,7 +188,9 @@ export class Query<M extends Model, R extends M | M[]> {
 
         return this.options.Model[$query](params)
             .then(res => {
-                if (this.options.one) {
+                if (typeof res === 'number') {
+                    onfulfilled(res as R)
+                } else if (this.options.one) {
                     if (res.length === 0) {
                         onfulfilled()
                     } else {

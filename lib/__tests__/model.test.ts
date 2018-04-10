@@ -1,21 +1,14 @@
 import dynalite from 'dynalite'
-import { Model, $put } from '../model'
+import listen from 'test-listen'
+import { Model, $batchGet, $batchWrite, $put, $get } from '../model'
 import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
 
 const { AWS } = Model
 
 Object.assign(process.env, {
-    PORT: 45678,
     AWS_ACCESS_KEY_ID: 'AKID',
     AWS_SECRET_ACCESS_KEY: 'SECRET',
     AWS_REGION: 'cn-north-1',
-})
-const endpoint = `http://127.0.0.1:${process.env.PORT}`
-
-AWS.config.update({
-    dynamodb: {
-        endpoint,
-    },
 })
 
 describe('Model', () => {
@@ -33,42 +26,31 @@ describe('Model', () => {
     })
 
     describe('dynamodb', () => {
-        let dynaliteServer, dynamo: AWS.DynamoDB
+        let dynaliteServer
 
-        beforeEach(() => {
-            return new Promise((resolve, reject) => {
-                dynaliteServer = dynalite({
-                    createTableMs: 0,
-                    updateTableMs: 0,
-                    deleteTableMs: 0,
-                })
-                dynaliteServer.listen(process.env.PORT, function (err) {
-                    if (err) return reject(err)
-                    // console.log('Dynalite started on port 45678')
-                    dynamo = new AWS.DynamoDB()
-                    resolve()
-                })
+        beforeEach(async () => {
+            dynaliteServer = dynalite({
+                createTableMs: 0,
+                updateTableMs: 0,
+                deleteTableMs: 0,
             })
+            const endpoint: string = await listen(dynaliteServer)
+            Model.ddb = new AWS.DynamoDB({ endpoint })
+            Model.client = new AWS.DynamoDB.DocumentClient({ service: Model.ddb })
         })
 
         afterEach(() => {
-            return new Promise((resolve, reject) => {
-                dynaliteServer.close((err) => {
-                    if (err) return reject(err)
-                    // console.log('Dynalite closed')
-                    resolve()
-                })
-            })
+            dynaliteServer.close() // dont wait bcs port is random
         })
 
         it('dynalite', async () => {
-            let { TableNames } = await dynamo.listTables().promise()
+            let { TableNames } = await Model.ddb.listTables().promise()
 
             expect(TableNames.length).toBe(0)
         })
 
         it('create table', async () => {
-            let { TableDescription } = await dynamo.createTable({
+            let { TableDescription } = await Model.ddb.createTable({
                 TableName: 'test',
                 AttributeDefinitions: [{
                     AttributeName: 'name',
@@ -86,7 +68,7 @@ describe('Model', () => {
 
             expect(TableDescription.TableName).toBe('test')
 
-            let { Table } = await dynamo.describeTable({
+            let { Table } = await Model.ddb.describeTable({
                 TableName: 'test',
             }).promise()
 
@@ -101,7 +83,7 @@ describe('Model', () => {
             }
 
             beforeEach(async () => {
-                await dynamo.createTable({
+                await Model.ddb.createTable({
                     TableName: 'Foo',
                     AttributeDefinitions: [{
                         AttributeName: 'id',
@@ -128,14 +110,23 @@ describe('Model', () => {
         })
 
         describe('get', () => {
-            class Example extends Model {
+            class GetExample extends Model {
                 @required
                 id: string
+
+                @optional
+                name?: string
+
+                @optional
+                obj?: any
+
+                @optional
+                arr?: string[]
             }
 
             beforeEach(async () => {
-                await dynamo.createTable({
-                    TableName: 'Example',
+                await Model.ddb.createTable({
+                    TableName: 'GetExample',
                     AttributeDefinitions: [{
                         AttributeName: 'id',
                         AttributeType: 'S',
@@ -149,12 +140,211 @@ describe('Model', () => {
                         WriteCapacityUnits: 1,
                     }
                 } as AWS.DynamoDB.CreateTableInput).promise()
+
+                await GetExample.create({ id: '1', name: '1', arr: ['1'] })
+                await GetExample.create({ id: '2', name: '1', arr: ['2'] })
             })
 
             it('return undefined if not found', async () => {
-                let e = await Example.get({ id: '1' })
+                let e = await GetExample.get({ id: '0' })
 
                 expect(e).toBeUndefined()
+            })
+
+            it('get id = 1', async () => {
+                let e = await GetExample.get({ id: '1' })
+
+                expect(e.id).toBe('1')
+            })
+
+            it('get id = 1 select arr', async () => {
+                let e = await GetExample.get({ id: '1' })
+                    .select('arr[0]')
+
+                expect(e.name).toBeUndefined()
+                expect(e.arr[0]).toBe('1')
+            })
+        })
+
+        describe('batch', () => {
+            class BatchExample extends Model {
+                @hashKey id: number
+
+                @optional data?: any
+            }
+
+            const ids = Array(5).fill(0).map((_, i) => i + 1)
+            const data = {
+                a: '0'.repeat(399).repeat(1024), // // 399KB
+            }
+
+            beforeEach(async () => {
+                await Model.ddb.createTable({
+                    TableName: 'BatchExample',
+                    AttributeDefinitions: [{
+                        AttributeName: 'id',
+                        AttributeType: 'N',
+                    }],
+                    KeySchema: [{
+                        AttributeName: 'id',
+                        KeyType: 'HASH',
+                    }],
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1000,
+                        WriteCapacityUnits: 1000,
+                    },
+                }).promise()
+            })
+
+            it('$batchGet is a async generator and multi times yield', async () => {
+                await Promise.all(ids.map(id => BatchExample.create({ id, data })))
+                let i = 0, a = []
+                for await (let r of BatchExample[$batchGet]({
+                    RequestItems: {
+                        BatchExample: {
+                            Keys: ids.map(id => ({ id }))
+                        }
+                    }
+                })) {
+                    i++
+                    a = a.concat(r.BatchExample)
+                }
+
+                expect(i).toBe(2)
+                expect(a.length).toBe(5)
+            })
+
+            it('$batchWrite is a async generator', async () => {
+                let i = 0
+                let a = []
+                for await (let r of BatchExample[$batchWrite]({
+                    RequestItems: {
+                        BatchExample: ids.map(id => ({ PutRequest: { Item: { id, data: {} } } })),
+                    }
+                })) {
+                    i++
+                    a = a.concat(r)
+                }
+
+                // dynalite not response if batchWrite too big.
+                expect(i).toBe(1)
+                expect(a.length).toBe(1)
+
+                let e3 = await BatchExample.get({ id: 3 })
+                expect(e3).toBeTruthy()
+
+                i = 0
+                a = []
+                for await (let r of BatchExample[$batchWrite]({
+                    RequestItems: {
+                        BatchExample: ids.map(id => ({ DeleteRequest: { Key: { id } } })),
+                    }
+                })) {
+                    i++
+                    a = a.concat(r)
+                }
+
+                expect(i).toBe(1)
+                expect(a.length).toBe(1)
+
+                let e1 = await BatchExample.get({ id: 1 })
+                expect(e1).toBeUndefined()
+            })
+
+            it('batch get await items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+
+                let result = await BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+
+                expect(result.length).toBe(2)
+                result.forEach(r => expect(r).toBeInstanceOf(BatchExample))
+            })
+
+            it('batch get for await items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+
+                let it = BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+
+                for await (let e of it) {
+                    expect(e).toBeInstanceOf(BatchExample)
+                }
+            })
+
+            it('batch get select item props', async () => {
+                await BatchExample.create({ id: 1, data: { a: 1, b: 1 } })
+                await BatchExample.create({ id: 2, data: { a: 2, b: 2 } })
+
+                let it = BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+                    .select('data.a')
+
+                for await (let e of it) {
+                    expect(e).toBeInstanceOf(BatchExample)
+                    expect(e.id).toBeUndefined()
+                    expect(e.data.a).toBeTruthy()
+                    expect(e.data.b).toBeUndefined()
+                }
+            })
+
+            it('batch put items', async () => {
+                let it = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
+                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
+            })
+
+            it('batch delete items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                let it = BatchExample.batch()
+                    .delete([{ id: 1 }, { id: 2 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toBeUndefined()
+                await expect(BatchExample.get({ id: 2 })).resolves.toBeUndefined()
+            })
+
+            it('batch put items then delete', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                await BatchExample.create({ id: 3 })
+                let it = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+                    .delete([{ id: 3 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
+                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
+                await expect(BatchExample.get({ id: 3 })).resolves.toBeUndefined()
+            })
+
+            it('throw if put and delete have same key', async () => {
+                let p = BatchExample.batch()
+                    .put([{ id: 1 }])
+                    .delete([{ id: 1 }])
+                
+                await expect(p).rejects.toThrow('Provided list of item keys contains duplicates')
+            })
+
+            it('batch put delete and get', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                await BatchExample.create({ id: 3 })
+                let p = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+                    .delete([{ id: 3 }])
+                    .get([{ id: 1 }, { id: 2 }])
+
+                await expect(p).resolves.toHaveLength(2)
             })
         })
 
@@ -171,7 +361,7 @@ describe('Model', () => {
             }
 
             beforeEach(async () => {
-                await dynamo.createTable({
+                await Model.ddb.createTable({
                     TableName: 'Example',
                     AttributeDefinitions: [{
                         AttributeName: 'id',
@@ -253,19 +443,19 @@ describe('Model', () => {
             })
 
             it('query one where id = 1', async () => {
-                let res = await Example.findOne().where('id').eq('1')
+                let res = await Example.query().one().where('id').eq('1')
 
                 expect(res.id).toBe('1')
             })
 
             it('query where id = 1', async () => {
-                let res = await Example.find().where('id').eq('1')
+                let res = await Example.query().where('id').eq('1')
 
                 expect(res.length).toBe(1)
             })
 
             it('query uid = 1 and between a c', async () => {
-                let res = await Example.find()
+                let res = await Example.query()
                     .index('uid-name-global')
                     .where('uid').eq('1')
                     .where('name').between(['a', 'c'])
@@ -275,17 +465,24 @@ describe('Model', () => {
             })
 
             it('query one from index uid-global', async () => {
-                let m = await Example.findOne()
+                let m = await Example.query().one()
                     .index('uid-global')
                     .where('uid').eq('1')
 
                 expect(m.id).toBe('2')
 
-                let n = await Example.findOne()
+                let n = await Example.query().one()
                     .index('uid-global')
                     .where('uid').eq('-1')
 
                 expect(n).toBeUndefined()
+            })
+
+            it('query one model', async () => {
+                let m = await Example.query().one()
+                    .where('id').eq('1')
+
+                expect(m.id).toBe('1')
             })
         })
 
@@ -303,6 +500,10 @@ describe('Model', () => {
                     displayName: string
                     phone: number
                     address: string
+                    wechat: {
+                        openId: string
+                        name: string
+                    }
                 }
                 @optional pets?: {
                     name: string
@@ -311,7 +512,7 @@ describe('Model', () => {
             }
 
             beforeEach(async () => {
-                await dynamo.createTable({
+                await Model.ddb.createTable({
                     TableName: 'Example',
                     AttributeDefinitions: [{
                         AttributeName: 'id',
@@ -438,6 +639,23 @@ describe('Model', () => {
                 expect(e.pets[0].age).toBe(17)
             })
 
+            it('update id = 1 set wechat name', async () => {
+                let e = await Example.update({ id: '1' })
+                    .where('id').exists()
+                    .set('profile').ifNotExists({})
+                e = await Example.update({ id: '1' })
+                    .where('id').exists()
+                    .set('profile.wechat').ifNotExists({
+                        name: 'foo',
+                    })
+                // e = await Example.update({ id: '1' })
+                //     .where('id').exists()
+                //     // .set('profile').ifNotExists({})
+                //     .set('profile.wechat.name').to('foo')
+
+                expect(e.profile.wechat.name).toBe('foo')
+            })
+
             it('update id = 1 remove weight', async () => {
                 let e = await Example.update({ id: '1' })
                     .remove('weight')
@@ -514,7 +732,7 @@ describe('Model', () => {
             }
 
             beforeEach(async () => {
-                await dynamo.createTable({
+                await Model.ddb.createTable({
                     TableName: 'Example',
                     AttributeDefinitions: [{
                         AttributeName: 'id',
@@ -579,40 +797,40 @@ describe('Model', () => {
                 ])
             })
 
-            it('remove with hash', async () => {
+            it('delete with hash', async () => {
                 await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
-                let e = await Example.remove({ id: '4' })
+                let e = await Example.delete({ id: '4' })
 
                 expect(e.name).toBe('joe')
 
-                let a = await Example.find().where('id').eq('4')
+                let a = await Example.query().where('id').eq('4')
 
                 expect(a.length).toBe(0)
             })
 
-            it('throw when remove with wrong condition', async () => {
+            it('throw when delete with wrong condition', async () => {
                 await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
-                await expect(Example.remove({ id: '4' })
+                await expect(Example.delete({ id: '4' })
                     .where('age').gt(10)
                 ).rejects.toThrow('The conditional request failed')
 
-                let a = await Example.find().where('id').eq('4')
+                let a = await Example.query().where('id').eq('4')
 
                 expect(a.length).toBe(1)
             })
 
-            it('remove instance', async () => {
+            it('delete instance', async () => {
                 await Example.create({ id: '4', name: 'joe', age: 5, height: 50, weight: 30 })
                 let e = await Example.get({ id: '4' })
-                await e.remove()
-                let a = await Example.find().where('id').eq('4')
+                await e.delete()
+                let a = await Example.query().where('id').eq('4')
 
                 expect(a.length).toBe(0)
             })
         })
 
         xit('', async () => {
-            await dynamo.createTable({
+            await Model.ddb.createTable({
                 TableName: 'Example',
                 AttributeDefinitions: [{
                     AttributeName: 'id',
