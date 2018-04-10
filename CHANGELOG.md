@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.4.0"></a>
+# [0.4.0](https://github.com/vitarn/tiamo/compare/v0.3.1...v0.4.0) (2018-04-10)
+
+
+### Bug Fixes
+
+* add Symbol.asyncIterator shim ([b1c9cf8](https://github.com/vitarn/tiamo/commit/b1c9cf8))
+* **expression:** allow empty op ([feaf653](https://github.com/vitarn/tiamo/commit/feaf653))
+* **expression:** allow empty op e.g. projection ([5d8adff](https://github.com/vitarn/tiamo/commit/5d8adff))
+* create check hash/range key not exists ([16c93cf](https://github.com/vitarn/tiamo/commit/16c93cf))
+* operation options value false ([71023b6](https://github.com/vitarn/tiamo/commit/71023b6))
+* put result merge old value ([076c792](https://github.com/vitarn/tiamo/commit/076c792))
+
+
+### Features
+
+* $query return async iterator now ([f830fc0](https://github.com/vitarn/tiamo/commit/f830fc0))
+* add put operate ([5394550](https://github.com/vitarn/tiamo/commit/5394550))
+* batch get write ([50c3c80](https://github.com/vitarn/tiamo/commit/50c3c80))
+* support scan ([533a514](https://github.com/vitarn/tiamo/commit/533a514))
+
+
+
 <a name="0.3.1"></a>
 ## [0.3.1](https://github.com/vitarn/tiamo/compare/v0.3.0...v0.3.1) (2018-03-31)
 
