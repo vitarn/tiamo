@@ -269,22 +269,29 @@ export class Model extends Schema {
         })
     }
 
-    static [$query](params: Partial<DocumentClient.QueryInput>) {
-        const p = { ...params } as DocumentClient.QueryInput
-        p.TableName = p.TableName || this.tableName
-        p.ReturnConsumedCapacity = p.ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY
+    static [$query] = async function* (this: ModelStatic<Model>, params: Partial<DocumentClient.QueryInput>) {
+        let ExclusiveStartKey
+        let { ReturnConsumedCapacity = RETURN_CONSUMED_CAPACITY, ...other } = params
+        let i = 0
 
-        log('⇡ [QUERY] request params:', p)
+        do {
+            i++
+            const p = { ...other, ExclusiveStartKey, ReturnConsumedCapacity } as DocumentClient.QueryInput
+            p.TableName = p.TableName || this.tableName
 
-        return this.client.query(p).promise().then(res => {
-            if (res.ConsumedCapacity) log('⇣ [QUERY] consumed capacity: ', res.ConsumedCapacity)
+            log('⇡ [QUERY]#%d request params: %o', i, p)
+
+            let res = await this.client.query(p).promise()
+            if (res.ConsumedCapacity) log('⇣ [QUERY]#%d consumed capacity:', i, res.ConsumedCapacity)
 
             if (p.Select === 'COUNT') {
-                return res.Count
+                yield res.Count
             } else {
-                return res.Items
+                yield res.Items
             }
-        })
+
+            ExclusiveStartKey = res.LastEvaluatedKey
+        } while (i == 0 || ExclusiveStartKey)
     }
 
     static [$scan] = async function* (this: ModelStatic<Model>, params: Partial<DocumentClient.ScanInput>) {
