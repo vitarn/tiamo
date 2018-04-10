@@ -1,6 +1,5 @@
-import { Query } from '../query'
-import { Model } from '../model'
-import { tableName } from '../decorator'
+import { Query } from '../lib/query'
+import { Model } from '../lib/model'
 
 describe('Query', () => {
     describe('toJSON', () => {

@@ -1,6 +1,5 @@
-import { Scan } from '../scan'
-import { Model } from '../model'
-import { tableName } from '../decorator'
+import { Scan } from '../lib/scan'
+import { Model } from '../lib/model'
 
 describe('Scan', () => {
     describe('toJSON', () => {

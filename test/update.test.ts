@@ -1,5 +1,5 @@
-import { Update } from '../update'
-import { createSet } from '../expression'
+import { Update } from '../lib/update'
+import { createSet } from '../lib/expression'
 
 describe('Update', () => {
     describe('toJSON', () => {

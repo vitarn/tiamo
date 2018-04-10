@@ -1,17 +1,13 @@
-import { BatchGet } from '../batchGet'
-import { Model } from '../model'
+import { Get } from '../lib/get'
 
-describe('BatchGet', () => {
-    class Example extends Model { }
-
+describe('Get', () => {
     describe('exprs', () => {
         it('select prop', () => {
-            let o = new BatchGet({ Model: Example })
+            let o = new Get()
                 .select('prop')
                 .toJSON()
 
-            expect(o.RequestItems.Example).toEqual({
-                Keys: [],
+            expect(o).toEqual({
                 ProjectionExpression: '#prop',
                 ExpressionAttributeNames: {
                     '#prop': 'prop',
@@ -20,12 +16,11 @@ describe('BatchGet', () => {
         })
 
         it('select name prop.sub[0]', () => {
-            let o = new BatchGet({ Model: Example })
+            let o = new Get()
                 .select('name prop.sub[0]')
                 .toJSON()
 
-            expect(o.RequestItems.Example).toEqual({
-                Keys: [],
+            expect(o).toEqual({
                 ProjectionExpression: '#name, #prop.#sub[0]',
                 ExpressionAttributeNames: {
                     '#name': 'name',
@@ -36,12 +31,11 @@ describe('BatchGet', () => {
         })
 
         it('select ["name", "prop.sub[0]"]', () => {
-            let o = new BatchGet({ Model: Example })
+            let o = new Get()
                 .select(['name', 'prop.sub[0]'])
                 .toJSON()
 
-            expect(o.RequestItems.Example).toEqual({
-                Keys: [],
+            expect(o).toEqual({
                 ProjectionExpression: '#name, #prop.#sub[0]',
                 ExpressionAttributeNames: {
                     '#name': 'name',
@@ -50,20 +44,5 @@ describe('BatchGet', () => {
                 },
             })
         })
-    })
-
-    it('is promise like', () => {
-        let bg = new BatchGet()
-
-        expect(typeof bg.then).toBe('function')
-        expect(typeof bg.catch).toBe('function')
-    })
-
-    it('is async iterable', () => {
-        let it = new BatchGet()[Symbol.asyncIterator]()
-
-        expect(typeof it.next).toBe('function')
-        expect(typeof it.throw).toBe('function')
-        expect(typeof it.return).toBe('function')
     })
 })

@@ -1,7 +1,7 @@
 import dynalite from 'dynalite'
 import listen from 'test-listen'
-import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
+import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../lib/model'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../lib/decorator'
 
 const { AWS } = Model
 

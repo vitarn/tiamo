@@ -1,5 +1,5 @@
-import { Model } from '../model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../decorator'
+import { Model } from '../lib/model'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../lib/decorator'
 
 describe('decorator', () => {
     describe('tableName', () => {
