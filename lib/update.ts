@@ -204,11 +204,11 @@ export interface UpdateOptions<M extends Model> extends Partial<DocumentClient.U
     Model?: M['constructor']
     logic?: ExpressionLogic
     leaf?: boolean
+    condExprs?: string[]
     setExprs?: string[]
     removeExprs?: string[]
     addExprs?: string[]
     deleteExprs?: string[]
-    condExprs?: string[]
     names?: { [name: string]: string }
     values?: { [name: string]: any }
 }
