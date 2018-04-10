@@ -126,28 +126,12 @@ export class Scan<M extends Model> implements AsyncIterable<M>{
         if (Object.keys(values).length) options.ExpressionAttributeValues = values
 
         return (this.constructor as typeof Scan).PARAM_KEYS.reduce((json, key) => {
-            if (options[key]) {
-                json[key] = options[key]
+            const value = options[key]
+            if (typeof value !== 'undefined') {
+                json[key] = value
             }
             return json
         }, {})
-    }
-
-    /**
-     * Count of results
-     * 
-     * Set `Select = 'COUNT'` then invoke dynamodb scan operation.
-     */
-    async count() {
-        this.options.Select = 'COUNT'
-        
-        const { Model } = this.options
-        let i = 0
-        for await (let items of Model[$scan](this.toJSON())) {
-            i += items as number
-        }
-
-        return i
     }
 
     limit(val: number) {
@@ -166,6 +150,23 @@ export class Scan<M extends Model> implements AsyncIterable<M>{
         this.options.IndexName = name
 
         return this
+    }
+
+    /**
+     * Count of results
+     * 
+     * Set `Select = 'COUNT'` then invoke dynamodb scan operation.
+     */
+    async count() {
+        this.options.Select = 'COUNT'
+
+        const { Model } = this.options
+        let total = 0
+        for await (let items of Model[$scan](this.toJSON())) {
+            total += items as number
+        }
+
+        return total
     }
 
     async then<TRes>(

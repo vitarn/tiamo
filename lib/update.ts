@@ -169,8 +169,9 @@ export class Update<M extends Model> {
         if (Object.keys(values).length) options.ExpressionAttributeValues = values
 
         return (this.constructor as typeof Update).UPDATE_KEYS.reduce((json, key) => {
-            if (options[key]) {
-                json[key] = options[key]
+            const value = options[key]
+            if (typeof value !== 'undefined') {
+                json[key] = value
             }
             return json
         }, {})
