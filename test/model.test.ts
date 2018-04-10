@@ -109,6 +109,91 @@ describe('Model', () => {
             })
         })
 
+        describe('put', () => {
+            class PutExample extends Model {
+                @hashKey
+                id: number
+
+                @optional
+                name?: string
+
+                @optional
+                obj?: any
+
+                @optional
+                arr?: string[]
+            }
+
+            beforeEach(async () => {
+                await Model.ddb.createTable({
+                    TableName: 'PutExample',
+                    AttributeDefinitions: [{
+                        AttributeName: 'id',
+                        AttributeType: 'N',
+                    }],
+                    KeySchema: [{
+                        AttributeName: 'id',
+                        KeyType: 'HASH',
+                    }],
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1,
+                        WriteCapacityUnits: 1,
+                    }
+                } as AWS.DynamoDB.CreateTableInput).promise()
+            })
+
+            it('put item into db', async () => {
+                let e = await PutExample.put({ id: 1 })
+
+                e = await PutExample.get({ id: 1 })
+
+                expect(e.id).toBe(1)
+            })
+
+            it('put item overwrite existed item', async () => {
+                let e = await PutExample.put({ id: 1, name: 'abc' })
+                e = await PutExample.put({ id: 1, name: 'def' })
+
+                e = await PutExample.get({ id: 1 })
+
+                expect(e).toEqual({ id: 1, name: 'def' })
+            })
+
+            it('put item return value merge Item into old', async () => {
+                let e = await PutExample.put({ id: 1 })
+
+                expect(e).toEqual({ id: 1 })
+
+                e = await PutExample.put({ id: 1, name: 'abc' })
+
+                expect(e).toEqual({ id: 1, name: 'abc' })
+            })
+
+            it('put item if cond is true', async () => {
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('id').not.exists()).resolves.toEqual({ id: 1, name: 'abc' })
+
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('id').exists()).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('id').eq(1)).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('id').gte(1)).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').begins('a')).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').between(['a', 'b'])).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').contains('c')).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').gte('a')).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').in(['abc', 'def'])).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').type('S')).resolves.toEqual({ id: 1, name: 'abc' })
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('name').size.eq(3)).resolves.toEqual({ id: 1, name: 'abc' })
+            })
+
+            it('throw when put item cond fail', async () => {
+                await expect(PutExample.put({ id: 1, name: 'abc' }).where('id').not.exists()).resolves.toEqual({ id: 1, name: 'abc' })
+
+                await expect(PutExample.put({ id: 1 }).where('id').not.exists()).rejects.toThrow('The conditional request failed')
+                await expect(PutExample.put({ id: 1 }).where('id').ne(1)).rejects.toThrow('The conditional request failed')
+                await expect(PutExample.put({ id: 1 }).where('id').gt(1)).rejects.toThrow('The conditional request failed')
+                await expect(PutExample.put({ id: 1 }).where('name').begins('z')).rejects.toThrow('The conditional request failed')
+            })
+        })
+
         describe('get', () => {
             class GetExample extends Model {
                 @required
@@ -163,188 +248,6 @@ describe('Model', () => {
 
                 expect(e.name).toBeUndefined()
                 expect(e.arr[0]).toBe('1')
-            })
-        })
-
-        describe('batch', () => {
-            class BatchExample extends Model {
-                @hashKey id: number
-
-                @optional data?: any
-            }
-
-            const ids = Array(5).fill(0).map((_, i) => i + 1)
-            const data = {
-                a: '0'.repeat(399).repeat(1024), // // 399KB
-            }
-
-            beforeEach(async () => {
-                await Model.ddb.createTable({
-                    TableName: 'BatchExample',
-                    AttributeDefinitions: [{
-                        AttributeName: 'id',
-                        AttributeType: 'N',
-                    }],
-                    KeySchema: [{
-                        AttributeName: 'id',
-                        KeyType: 'HASH',
-                    }],
-                    ProvisionedThroughput: {
-                        ReadCapacityUnits: 1000,
-                        WriteCapacityUnits: 1000,
-                    },
-                }).promise()
-            })
-
-            it('$batchGet is a async generator and multi times yield', async () => {
-                await Promise.all(ids.map(id => BatchExample.create({ id, data })))
-                let i = 0, a = []
-                for await (let r of BatchExample[$batchGet]({
-                    RequestItems: {
-                        BatchExample: {
-                            Keys: ids.map(id => ({ id }))
-                        }
-                    }
-                })) {
-                    i++
-                    a = a.concat(r.BatchExample)
-                }
-
-                expect(i).toBe(2)
-                expect(a.length).toBe(5)
-            })
-
-            it('$batchWrite is a async generator', async () => {
-                let i = 0
-                let a = []
-                for await (let r of BatchExample[$batchWrite]({
-                    RequestItems: {
-                        BatchExample: ids.map(id => ({ PutRequest: { Item: { id, data: {} } } })),
-                    }
-                })) {
-                    i++
-                    a = a.concat(r)
-                }
-
-                // dynalite not response if batchWrite too big.
-                expect(i).toBe(1)
-                expect(a.length).toBe(1)
-
-                let e3 = await BatchExample.get({ id: 3 })
-                expect(e3).toBeTruthy()
-
-                i = 0
-                a = []
-                for await (let r of BatchExample[$batchWrite]({
-                    RequestItems: {
-                        BatchExample: ids.map(id => ({ DeleteRequest: { Key: { id } } })),
-                    }
-                })) {
-                    i++
-                    a = a.concat(r)
-                }
-
-                expect(i).toBe(1)
-                expect(a.length).toBe(1)
-
-                let e1 = await BatchExample.get({ id: 1 })
-                expect(e1).toBeUndefined()
-            })
-
-            it('batch get await items', async () => {
-                await BatchExample.create({ id: 1 })
-                await BatchExample.create({ id: 2 })
-
-                let result = await BatchExample.batch()
-                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
-
-                expect(result.length).toBe(2)
-                result.forEach(r => expect(r).toBeInstanceOf(BatchExample))
-            })
-
-            it('batch get for await items', async () => {
-                await BatchExample.create({ id: 1 })
-                await BatchExample.create({ id: 2 })
-
-                let it = BatchExample.batch()
-                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
-
-                for await (let e of it) {
-                    expect(e).toBeInstanceOf(BatchExample)
-                }
-            })
-
-            it('batch get select item props', async () => {
-                await BatchExample.create({ id: 1, data: { a: 1, b: 1 } })
-                await BatchExample.create({ id: 2, data: { a: 2, b: 2 } })
-
-                let it = BatchExample.batch()
-                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
-                    .select('data.a')
-
-                for await (let e of it) {
-                    expect(e).toBeInstanceOf(BatchExample)
-                    expect(e.id).toBeUndefined()
-                    expect(e.data.a).toBeTruthy()
-                    expect(e.data.b).toBeUndefined()
-                }
-            })
-
-            it('batch put items', async () => {
-                let it = BatchExample.batch()
-                    .put([{ id: 1 }, { id: 2 }])
-
-                for await (let e of it) { }
-
-                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
-                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
-            })
-
-            it('batch delete items', async () => {
-                await BatchExample.create({ id: 1 })
-                await BatchExample.create({ id: 2 })
-                let it = BatchExample.batch()
-                    .delete([{ id: 1 }, { id: 2 }])
-
-                for await (let e of it) { }
-
-                await expect(BatchExample.get({ id: 1 })).resolves.toBeUndefined()
-                await expect(BatchExample.get({ id: 2 })).resolves.toBeUndefined()
-            })
-
-            it('batch put items then delete', async () => {
-                await BatchExample.create({ id: 1 })
-                await BatchExample.create({ id: 2 })
-                await BatchExample.create({ id: 3 })
-                let it = BatchExample.batch()
-                    .put([{ id: 1 }, { id: 2 }])
-                    .delete([{ id: 3 }])
-
-                for await (let e of it) { }
-
-                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
-                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
-                await expect(BatchExample.get({ id: 3 })).resolves.toBeUndefined()
-            })
-
-            it('throw if put and delete have same key', async () => {
-                let p = BatchExample.batch()
-                    .put([{ id: 1 }])
-                    .delete([{ id: 1 }])
-                
-                await expect(p).rejects.toThrow('Provided list of item keys contains duplicates')
-            })
-
-            it('batch put delete and get', async () => {
-                await BatchExample.create({ id: 1 })
-                await BatchExample.create({ id: 2 })
-                await BatchExample.create({ id: 3 })
-                let p = BatchExample.batch()
-                    .put([{ id: 1 }, { id: 2 }])
-                    .delete([{ id: 3 }])
-                    .get([{ id: 1 }, { id: 2 }])
-
-                await expect(p).resolves.toHaveLength(2)
             })
         })
 
@@ -716,10 +619,6 @@ describe('Model', () => {
                     .set('profile.wechat').ifNotExists({
                         name: 'foo',
                     })
-                // e = await Example.update({ id: '1' })
-                //     .where('id').exists()
-                //     // .set('profile').ifNotExists({})
-                //     .set('profile.wechat.name').to('foo')
 
                 expect(e.profile.wechat.name).toBe('foo')
             })
@@ -894,6 +793,188 @@ describe('Model', () => {
                 let a = await Example.query().where('id').eq('4')
 
                 expect(a.length).toBe(0)
+            })
+        })
+
+        describe('batch', () => {
+            class BatchExample extends Model {
+                @hashKey id: number
+
+                @optional data?: any
+            }
+
+            const ids = Array(5).fill(0).map((_, i) => i + 1)
+            const data = {
+                a: '0'.repeat(399).repeat(1024), // // 399KB
+            }
+
+            beforeEach(async () => {
+                await Model.ddb.createTable({
+                    TableName: 'BatchExample',
+                    AttributeDefinitions: [{
+                        AttributeName: 'id',
+                        AttributeType: 'N',
+                    }],
+                    KeySchema: [{
+                        AttributeName: 'id',
+                        KeyType: 'HASH',
+                    }],
+                    ProvisionedThroughput: {
+                        ReadCapacityUnits: 1000,
+                        WriteCapacityUnits: 1000,
+                    },
+                }).promise()
+            })
+
+            it('$batchGet is a async generator and multi times yield', async () => {
+                await Promise.all(ids.map(id => BatchExample.create({ id, data })))
+                let i = 0, a = []
+                for await (let r of BatchExample[$batchGet]({
+                    RequestItems: {
+                        BatchExample: {
+                            Keys: ids.map(id => ({ id }))
+                        }
+                    }
+                })) {
+                    i++
+                    a = a.concat(r.BatchExample)
+                }
+
+                expect(i).toBe(2)
+                expect(a.length).toBe(5)
+            })
+
+            it('$batchWrite is a async generator', async () => {
+                let i = 0
+                let a = []
+                for await (let r of BatchExample[$batchWrite]({
+                    RequestItems: {
+                        BatchExample: ids.map(id => ({ PutRequest: { Item: { id, data: {} } } })),
+                    }
+                })) {
+                    i++
+                    a = a.concat(r)
+                }
+
+                // dynalite not response if batchWrite too big.
+                expect(i).toBe(1)
+                expect(a.length).toBe(1)
+
+                let e3 = await BatchExample.get({ id: 3 })
+                expect(e3).toBeTruthy()
+
+                i = 0
+                a = []
+                for await (let r of BatchExample[$batchWrite]({
+                    RequestItems: {
+                        BatchExample: ids.map(id => ({ DeleteRequest: { Key: { id } } })),
+                    }
+                })) {
+                    i++
+                    a = a.concat(r)
+                }
+
+                expect(i).toBe(1)
+                expect(a.length).toBe(1)
+
+                let e1 = await BatchExample.get({ id: 1 })
+                expect(e1).toBeUndefined()
+            })
+
+            it('batch get await items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+
+                let result = await BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+
+                expect(result.length).toBe(2)
+                result.forEach(r => expect(r).toBeInstanceOf(BatchExample))
+            })
+
+            it('batch get for await items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+
+                let it = BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+
+                for await (let e of it) {
+                    expect(e).toBeInstanceOf(BatchExample)
+                }
+            })
+
+            it('batch get select item props', async () => {
+                await BatchExample.create({ id: 1, data: { a: 1, b: 1 } })
+                await BatchExample.create({ id: 2, data: { a: 2, b: 2 } })
+
+                let it = BatchExample.batch()
+                    .get([{ id: 1 }, { id: 2 }, { id: 3 }])
+                    .select('data.a')
+
+                for await (let e of it) {
+                    expect(e).toBeInstanceOf(BatchExample)
+                    expect(e.id).toBeUndefined()
+                    expect(e.data.a).toBeTruthy()
+                    expect(e.data.b).toBeUndefined()
+                }
+            })
+
+            it('batch put items', async () => {
+                let it = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
+                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
+            })
+
+            it('batch delete items', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                let it = BatchExample.batch()
+                    .delete([{ id: 1 }, { id: 2 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toBeUndefined()
+                await expect(BatchExample.get({ id: 2 })).resolves.toBeUndefined()
+            })
+
+            it('batch put items then delete', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                await BatchExample.create({ id: 3 })
+                let it = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+                    .delete([{ id: 3 }])
+
+                for await (let e of it) { }
+
+                await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
+                await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
+                await expect(BatchExample.get({ id: 3 })).resolves.toBeUndefined()
+            })
+
+            it('throw if put and delete have same key', async () => {
+                let p = BatchExample.batch()
+                    .put([{ id: 1 }])
+                    .delete([{ id: 1 }])
+
+                await expect(p).rejects.toThrow('Provided list of item keys contains duplicates')
+            })
+
+            it('batch put delete and get', async () => {
+                await BatchExample.create({ id: 1 })
+                await BatchExample.create({ id: 2 })
+                await BatchExample.create({ id: 3 })
+                let p = BatchExample.batch()
+                    .put([{ id: 1 }, { id: 2 }])
+                    .delete([{ id: 3 }])
+                    .get([{ id: 1 }, { id: 2 }])
+
+                await expect(p).resolves.toHaveLength(2)
             })
         })
 
