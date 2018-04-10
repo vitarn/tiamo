@@ -20,8 +20,8 @@ describe('Model', () => {
             id: string
         }
 
-        it('validate before save', async () => {
-            await expect(Foo.create({ id: 1 as any })).rejects.toThrow()
+        it('validate before create', async () => {
+            await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
         })
     })
 
@@ -75,10 +75,10 @@ describe('Model', () => {
             expect(Table.TableStatus).toBe('ACTIVE')
         })
 
-        describe('save', () => {
+        describe('create', () => {
             @tableName
             class Foo extends Model {
-                @required
+                @hashKey
                 id: string
             }
 
@@ -100,7 +100,7 @@ describe('Model', () => {
                 } as AWS.DynamoDB.CreateTableInput).promise()
             })
 
-            it('save into db', async () => {
+            it('create and insert into db', async () => {
                 await Foo.create({ id: '1' })
 
                 let foo = await Foo.get({ id: '1' })
@@ -196,7 +196,7 @@ describe('Model', () => {
 
         describe('get', () => {
             class GetExample extends Model {
-                @required
+                @hashKey
                 id: string
 
                 @optional

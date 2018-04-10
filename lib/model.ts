@@ -66,7 +66,11 @@ export class Model extends Schema {
      */
     static get hashKey() {
         const { metadata } = this
-        return Object.keys(metadata).find(key => metadata[key]['tiamo:hash'])
+        const key = Object.keys(metadata).find(key => metadata[key]['tiamo:hash'])
+
+        if (!key) throw new Error(`Model ${this.name} missing hash key`)
+
+        return key
     }
 
     /**
@@ -92,10 +96,15 @@ export class Model extends Schema {
     }
 
     /**
-     * Create model instance. Build and save.
+     * Create model instance. Build and put but not overwrite existed one.
      */
-    static create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {}) {
-        return (this.build(props, { convert: false }) as M).save(options)
+    static async create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {}) {
+        const Item = (this.build(props, { convert: false }) as M).validate({ raise: true }).value
+
+        const put = this.put(Item).where(this.hashKey).not.exists()
+        if (this.rangeKey) put.where(this.rangeKey).not.exists()
+
+        return put
     }
 
     /**
@@ -373,7 +382,7 @@ export class Model extends Schema {
      * Validate before save. Throw `ValidateError` if invalid. Apply casting and default if valid.
      */
     async save(options?) {
-        return this.constructor[$put]({
+        return this.constructor.put({
             Item: this.validate({ apply: true, raise: true }).value,
         }).then(() => this)
     }
