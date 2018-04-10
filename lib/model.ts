@@ -100,7 +100,7 @@ export class Model extends Schema {
      * Get item by key
      */
     static get<M extends Model>(this: ModelStatic<M>, Key: DocumentClient.Key) {
-        return new Get<M>({ Model: this, Key }) // .then(Item => Item && new this(Item) as M)
+        return new Get<M>({ Model: this, Key })
     }
 
     /**
@@ -134,16 +134,59 @@ export class Model extends Schema {
         return new Delete<M>({ Model: this, Key })
     }
 
+    /**
+     * Batch operate
+     * 
+     * * Chain call `put` and `delete`
+     * * One way switch context from `put` or `delete` to `get`
+     * * Operate order `put` -> `delete` -> `get` -> return
+     * 
+     * @return PromiseLike or AsyncIterable
+     * 
+     * @example
+     * 
+     *      // get only
+     *      Model.batch().get({})
+     *      // write only
+     *      Model.batch().put({})
+     *      // chain
+     *      Model.batch().put({}).delete({}).get({})
+     *      // async interator
+     *      for await (let m of Model.batch().get([])) {
+     *          console.log(m.id)
+     *      }
+     */
     static batch<M extends Model>(this: ModelStatic<M>) {
         const self = this
 
         return {
+            /**
+             * Batch get
+             * 
+             * @example
+             * 
+             *      Model.batch().get({ id: 1 })
+             */
             get(...GetKeys: DocumentClient.KeyList) {
                 return new BatchGet<M>({ Model: self, GetKeys })
             },
+            /**
+             * Batch write put request
+             * 
+             * @example
+             * 
+             *      Model.batch().put({ id: 1, name: 'tiamo' })
+             */
             put(...PutItems: DocumentClient.PutItemInputAttributeMap[]) {
                 return new BatchWrite<M>({ Model: self, PutItems })
             },
+            /**
+             * Batch write delete request
+             * 
+             * @example
+             * 
+             *      Model.batch().delete({ id: 1 })
+             */
             delete(...DeleteKeys: DocumentClient.KeyList) {
                 return new BatchWrite<M>({ Model: self, DeleteKeys })
             },
