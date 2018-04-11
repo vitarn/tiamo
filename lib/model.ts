@@ -78,6 +78,7 @@ export class Model extends Schema {
      */
     static get rangeKey() {
         const { metadata } = this
+
         return Object.keys(metadata).find(key => metadata[key]['tiamo:range'])
     }
 
@@ -93,6 +94,27 @@ export class Model extends Schema {
      */
     static get localIndexes() {
         return dynamodbFor(this.prototype).localIndexes
+    }
+
+    /**
+     * Timestamps definition store in metadata
+     */
+
+    static get timestamps() {
+        const { metadata } = this
+
+        return Object.keys(metadata)
+            .reduce((obj, key) => {
+                const timestamp = metadata[key]['tiamo:timestamp']
+                if (timestamp) {
+                    obj[timestamp].push(key)
+                }
+                return obj
+            }, {
+                create: [] as string[],
+                update: [] as string[],
+                expire: [] as string[],
+            })
     }
 
     /**

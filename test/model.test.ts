@@ -1,7 +1,7 @@
 import dynalite from 'dynalite'
 import listen from 'test-listen'
 import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../lib/model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../lib/decorator'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../lib/decorator'
 
 const { AWS } = Model
 
@@ -22,6 +22,44 @@ describe('Model', () => {
 
         it('validate before create', async () => {
             await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
+        })
+    })
+
+    describe('timestamps', () => {
+        class Foo extends Model {
+            @timestamp
+            createdAt?: Date
+
+            @timestamp({ type: 'update' })
+            updatedAt?: Date
+
+            @timestamp({ type: 'expire' })
+            expiredAt?: number
+        }
+
+        class Bar extends Foo {
+            @timestamp
+            createTime?: Date
+
+            @timestamp({ type: 'update' })
+            updateTime?: Date
+
+            @timestamp({ type: 'expire' })
+            expireTime?: number
+        }
+
+        it('return timestamps from metadata', () => {
+            expect(Foo.timestamps).toEqual({
+                create: ['createdAt'],
+                update: ['updatedAt'],
+                expire: ['expiredAt'],
+            })
+
+            expect(Bar.timestamps).toEqual({
+                create: ['createdAt', 'createTime'],
+                update: ['updatedAt', 'updateTime'],
+                expire: ['expiredAt', 'expireTime'],
+            })
         })
     })
 
