@@ -107,3 +107,48 @@ export type IndexKeyOptions = {
     name?: string
     type?: 'hash' | 'range'
 }
+
+const timestampDescriptor: HandleDescriptor = (target, key, desc, [opts]) => {
+    const { type } = (opts || { type: 'create' }) as TimestampOptions
+    log('timestampDescriptor', target, key, desc, type)
+
+    const metadata = metadataFor(target, key)
+
+    // Dont rewrite existed tdv metadata
+    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+        if (~['create', 'update'].indexOf(type)) {
+            optional(j => j.date()
+                .iso()
+                .default(
+                    () => new Date().toISOString(),
+                    `${type} iso 8601 timestamp`
+                )
+                // .description(`${type} timestamp`)
+                .tags(['timestamp'])
+                .example('1970-01-01T00:00:00.000Z')
+            )(target, key, desc)
+        } else if (type === 'expire') {
+            optional(j => j.number()
+                .integer()
+                .positive()
+                .description(`${type} unix epoch timestamp`)
+                .tags(['timestamp'])
+                .example('946684800000')
+                .unit('seconds')
+            )(target, key, desc)
+        }
+    }
+
+    metadata['tiamo:timestamp'] = type
+}
+
+/**
+ * Mark timestamp field
+ */
+export const timestamp: FlexibleDecorator<TimestampOptions> = (...args) => {
+    return createDecorator(timestampDescriptor, args)
+}
+
+export type TimestampOptions = {
+    type?: 'create' | 'update' | 'expire'
+}

@@ -1,5 +1,5 @@
 import { Model } from '../lib/model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex } from '../lib/decorator'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../lib/decorator'
 
 describe('decorator', () => {
     describe('tableName', () => {
@@ -168,6 +168,56 @@ describe('decorator', () => {
             }
 
             expect(new Foo().validate().error).toBeNull()
+        })
+    })
+
+    describe('timestamp', () => {
+        class Foo extends Model {
+            @timestamp
+            createdAt?: Date
+
+            @timestamp({ type: 'update' })
+            updatedAt?: Date
+
+            @timestamp({ type: 'expire' })
+            expiredAt?: number
+        }
+
+        it('mark timestamps', () => {
+            let f = new Foo({})
+
+            expect(f.createdAt).toMatch(/^201/)
+            expect(f.updatedAt).toMatch(/^201/)
+            expect(f.expiredAt).toBeUndefined()
+        })
+
+        it('create and update timestamp is iso 8601', () => {
+            expect(new Foo({
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            }).validate().error).toBeNull()
+
+            expect(new Foo({
+                createdAt: '123',
+            }).validate().error).toBeTruthy()
+
+            expect(new Foo({
+                updatedAt: '123',
+            }).validate().error).toBeTruthy()
+        })
+
+        it('expire timestamp is unix epoch', () => {
+            expect(new Foo({
+                expiredAt: Math.floor(Date.now() / 1000),
+            }).validate().error).toBeNull()
+
+            expect(new Foo({
+                expiredAt: '123',
+            }).validate().error).toBeNull()
+
+            expect(new Foo({
+                expiredAt: 0,
+            }).validate().error).toBeTruthy()
         })
     })
 })
