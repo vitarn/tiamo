@@ -3,7 +3,6 @@ import { Schema, SchemaOptions, SchemaProperties, SchemaValidationOptions } from
 import { ValidationResult } from 'joi'
 import AWS from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { enumerable } from './decorator'
 import { Hook } from './hook'
 import { Put } from './put'
 import { Get } from './get'
@@ -25,6 +24,7 @@ export const $update = Symbol.for('update')
 export const $delete = Symbol.for('delete')
 export const $batchGet = Symbol.for('batchGet')
 export const $batchWrite = Symbol.for('batchWrite')
+export const $hook = Symbol.for('hook')
 
 const { NODE_ENV } = process.env
 const RETURN_CONSUMED_CAPACITY = NODE_ENV === 'production' ? 'NONE' : 'TOTAL'
@@ -130,16 +130,6 @@ export class Model extends Schema {
     }
 
     /**
-     * Hook singleton instance
-     */
-    // protected static get hook() {
-    //     const modelMeta = modelMetaFor(this.prototype)
-
-    //     return modelMeta.hook = modelMeta.hook || new Hook()
-    // }
-    protected static hook = new Hook()
-
-    /**
      * Timestamps definition store in metadata
      */
 
@@ -151,7 +141,7 @@ export class Model extends Schema {
         }
 
         const timestamps = {}
-        
+
         for (let type of ['create', 'update', 'expire']) {
             const key = `tiamo:timestamp:${type}`
             if (Reflect.hasMetadata(key, this.prototype)) {
@@ -160,14 +150,20 @@ export class Model extends Schema {
         }
 
         Reflect.defineMetadata(cacheKey, timestamps, this)
-        
+
         return timestamps
+    }
+
+    static init<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {} as ModelOptions) {
+        const { isNew, ...other } = options
+
+        return super.build(props, { ...other, convert: false }) as M
     }
 
     /**
      * Create model instance. Build and put but not overwrite existed one.
      */
-    static async create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {}) {
+    static async create<M extends Model>(this: ModelStatic<M>, props: SchemaProperties<M>, options = {} as ModelOptions) {
         const Item = (this.build(props, { convert: false }) as M).validate({ raise: true }).value
 
         const put = this.put(Item).where(this.hashKey).not.exists()
@@ -441,15 +437,43 @@ export class Model extends Schema {
      */
     ['constructor']: ModelStatic<this>
 
-    constructor(props?, options?: SchemaOptions) {
+    constructor(props?, options = {} as ModelOptions) {
         super(props, options)
+
+        if (options.isNew !== false) {
+            Reflect.defineMetadata('tiamo:cache:new', true, this)
+        }
+
+        this.pre('save', this.validate.bind(this))
+    }
+
+    get isNew() {
+        return !!Reflect.getOwnMetadata('tiamo:cache:new', this)
+    }
+    set isNew(value: boolean) {
+        Reflect.defineMetadata('tiamo:cache:new', value, this)
+    }
+
+    /**
+     * Hook instance
+     */
+    protected get [$hook]() {
+        if (Reflect.hasOwnMetadata('tiamo:cache:hook', this)) {
+            return Reflect.getOwnMetadata('tiamo:cache:hook', this) as Hook
+        }
+
+        const hook = new Hook()
+
+        Reflect.defineMetadata('tiamo:cache:hook', hook, this)
+
+        return hook
     }
 
     /**
      * Pre hook
      */
     pre(name: string, fn: Function) {
-        this.constructor.hook.pre(name, fn)
+        this[$hook].pre(name, fn)
 
         return this
     }
@@ -458,7 +482,7 @@ export class Model extends Schema {
      * Post hook
      */
     post(name: string, fn: Function) {
-        this.constructor.hook.post(name, fn)
+        this[$hook].post(name, fn)
 
         return this
     }
@@ -472,9 +496,8 @@ export class Model extends Schema {
     validate(options = {} as SchemaValidationOptions) {
         return this._validate(options)
     }
-    // @enumerable(false)
-    get _validate() {
-        return this.constructor.hook.wrap('validate', (options = {} as SchemaValidationOptions) => {
+    protected get _validate() {
+        return this[$hook].wrap('validate', (options = {} as SchemaValidationOptions) => {
             return super.validate({
                 // when true, ignores unknown keys with a function value. Defaults to false.
                 skipFunctions: true,
@@ -484,17 +507,26 @@ export class Model extends Schema {
             })
         })
     }
-    // set _validate(v) { }
 
     /**
      * Save into db
      * 
      * Validate before save. Throw `ValidateError` if invalid. Apply casting and default if valid.
      */
-    async save(options?) {
-        return this.constructor.put({
-            Item: this.validate({ apply: true, raise: true }).value,
-        }).then(() => this)
+    // async save(options?) {
+    //     return this.constructor.put({
+    //         Item: this.validate({ apply: true, raise: true }).value,
+    //     }).then(() => this)
+    // }
+    get save() {
+        return this[$hook].wrap('save', (options?) => {
+            const Item = this.validate({ apply: true, raise: true }).value
+
+            const put = this.constructor.put(Item).where(this.constructor.hashKey).not.exists()
+            if (this.constructor.rangeKey) put.where(this.constructor.rangeKey).not.exists()
+
+            return put
+        })
     }
 
     /**
@@ -513,7 +545,7 @@ export class Model extends Schema {
 /**
  * Model static method this type
  * This hack make sub class static method return sub instance
- * But break IntelliSense autocomplete in Typescript@2.7
+ * But break IntelliSense autocomplete in Typescript 2.7
  * 
  * @example
  * 
@@ -521,7 +553,10 @@ export class Model extends Schema {
  * 
  * @see https://github.com/Microsoft/TypeScript/issues/5863#issuecomment-302891200
  */
-export type ModelStatic<T> = typeof Model & {
+export type ModelStatic<T> = typeof Schema & typeof Model & {
     new(...args): T
-    // get(...args): any // IntelliSense still not work :(
+}
+
+export interface ModelOptions extends SchemaOptions {
+    isNew?: boolean
 }

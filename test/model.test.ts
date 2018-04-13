@@ -12,6 +12,23 @@ Object.assign(process.env, {
 })
 
 describe('Model', () => {
+    describe('constructor', () => {
+        class Foo extends Model {
+
+        }
+
+        it('default is new', () => {
+            let foo1 = new Foo()
+
+            expect(foo1.isNew).toBe(true)
+
+            let foo2 = new Foo({}, { isNew: false })
+
+            expect(foo2.isNew).toBe(false)
+            expect(foo1.isNew).toBe(true)
+        })
+    })
+
     describe('validate', () => {
         class Foo extends Model {
             @optional(j => j.string()
@@ -19,9 +36,9 @@ describe('Model', () => {
             )
             id: string
 
-            func = () => {}
+            func = () => { }
 
-            unknown? = 'who'
+            unknown?= 'who'
         }
 
         it('skip function property', () => {
@@ -38,6 +55,10 @@ describe('Model', () => {
 
         it('validate before create', async () => {
             await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
+        })
+
+        it('validate before create', async () => {
+            await expect(new Foo({ id: 42 as any }).save()).rejects.toThrow('"id" must be a string')
         })
     })
 
@@ -975,6 +996,15 @@ describe('Model', () => {
                 }
             })
 
+            it('batch get 110 items', async () => {
+                let keys = Array(110).fill(0).map((_, i) => ({ id: i }))
+                await Promise.all(keys.map(key => BatchExample.create(key)))
+                let res = await BatchExample.batch()
+                    .get(keys)
+
+                expect(res.length).toBe(110)
+            })
+
             it('batch put items', async () => {
                 let it = BatchExample.batch()
                     .put([{ id: 1 }, { id: 2 }])
@@ -1010,6 +1040,14 @@ describe('Model', () => {
                 await expect(BatchExample.get({ id: 1 })).resolves.toEqual({ id: 1 })
                 await expect(BatchExample.get({ id: 2 })).resolves.toEqual({ id: 2 })
                 await expect(BatchExample.get({ id: 3 })).resolves.toBeUndefined()
+            })
+
+            it('batch write 110 items', async () => {
+                let res = await BatchExample.batch()
+                    .put(Array(55).fill(0).map((_, i) => ({ id: i })))
+                    .delete(Array(55).fill(0).map((_, i) => ({ id: i + 55 })))
+
+                expect(res).toBe(Math.ceil(110 / 25))
             })
 
             it('throw if put and delete have same key', async () => {

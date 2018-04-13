@@ -1,3 +1,4 @@
+import 'reflect-metadata'
 import { Hook } from '../src/hook'
 
 describe('Hook', () => {
@@ -23,11 +24,22 @@ describe('Hook', () => {
         let preMock: jest.Mock, postMock: jest.Mock
 
         class Schema {
+            // ['constructor']: typeof Schema & { new(...args): Schema }
             constructor() {
                 this.pre('validate', () => this.cast())
             }
 
-            protected hook = new Hook()
+            protected get hook() {
+                if (Reflect.hasOwnMetadata('hook', this)) {
+                    return Reflect.getOwnMetadata('hook', this)
+                }
+                
+                const hook = new Hook()
+
+                Reflect.defineMetadata('hook', hook, this)
+
+                return hook
+            }
 
             pre(name: string, fn: Function) {
                 return this.hook.pre(name, fn)

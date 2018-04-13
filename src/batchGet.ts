@@ -68,11 +68,19 @@ export class BatchGet<M extends Model> extends ReadOperate<M> implements AsyncIt
 
         if (batchWrite) for await (let res of batchWrite) { }
 
-        for await (let map of Model[$batchGet](this.toJSON())) {
-            for (let props of map[Model.tableName]) {
-                yield new Model(props) as M
+        const params = this.toJSON()
+        const items = [...params.RequestItems[Model.tableName].Keys]
+
+        do {
+            // batchGet max 100
+            const part = params.RequestItems[Model.tableName].Keys = items.splice(0, 100)
+
+            for await (let map of Model[$batchGet](params)) {
+                for (let props of map[Model.tableName]) {
+                    yield new Model(props) as M
+                }
             }
-        }
+        } while (items.length)
     }
 }
 

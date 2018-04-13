@@ -67,20 +67,30 @@ export class BatchWrite<M extends Model> extends WriteOperate<M> implements Asyn
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         try {
-            let i = 0
+            // how many times batchWrite processed.
+            let time = 0
             for await (let m of this) {
-                i++
+                time++
             }
-            onfulfilled(i)
+            onfulfilled(time)
         } catch (err) {
             onrejected(err)
         }
     }
 
     [Symbol.asyncIterator] = async function* (this: BatchWrite<M>) {
-        for await (let res of Model[$batchWrite](this.toJSON())) {
-            yield res
-        }
+        const { Model } = this.options
+        const params = this.toJSON()
+        const items = [...params.RequestItems[Model.tableName]]
+
+        do {
+            // batchWrite max 25
+            const part = params.RequestItems[Model.tableName] = items.splice(0, 25)
+
+            for await (let res of Model[$batchWrite](params)) {
+                yield res
+            }
+        } while (items.length)
     }
 }
 
