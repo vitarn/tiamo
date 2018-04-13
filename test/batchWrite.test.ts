@@ -1,5 +1,5 @@
-import { BatchWrite } from '../lib/batchWrite'
-import { Model } from '../lib/model'
+import { BatchWrite } from '../src/batchWrite'
+import { Model } from '../src/model'
 
 describe('BatchWrite', () => {
     class Example extends Model { }

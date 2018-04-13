@@ -1,5 +1,5 @@
-import { Query } from '../lib/query'
-import { Model } from '../lib/model'
+import { Query } from '../src/query'
+import { Model } from '../src/model'
 
 describe('Query', () => {
     describe('toJSON', () => {

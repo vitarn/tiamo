@@ -58,5 +58,5 @@ typings/
 .env
 
 # Project
-*.js
-*.d.ts
+lib
+es

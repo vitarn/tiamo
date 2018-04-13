@@ -1,22 +1,11 @@
 import debug from './debug'
-import { metadataFor, createDecorator, required, optional, HandleDescriptor, FlexibleDecorator} from 'tdv'
-import { dynamodbFor } from './metadata'
+import { createDecorator, required, optional, HandleDescriptor, FlexibleDecorator} from 'tdv'
+// import { modelMetaFor } from './metadata'
 import { Model } from './model'
 
 const log = debug('decorator')
 
 export { required, optional } from 'tdv'
-
-const tableDescriptor: HandleDescriptor = (target, [name]) => {
-    log('tableDescriptor', target, name)
-    const dynamodb = dynamodbFor((target as Function).prototype)
-
-    if (typeof name === 'string') {
-        dynamodb.tableName = name
-    } else if (typeof target === 'function') {
-        dynamodb.tableName = target.name
-    }
-}
 
 /**
  * Set DynamoDB table name for `Model` class
@@ -25,21 +14,22 @@ const tableDescriptor: HandleDescriptor = (target, [name]) => {
  *      `@tableName('foos') class Foo extends Model {} // Foo.tableName === 'foos'`
  */
 export const tableName: FlexibleDecorator<string> = (...args) => {
-    return createDecorator(tableDescriptor, args)
+    return createDecorator((target, [name]) => {
+        log('tableDescriptor', target, name)
+
+        Reflect.defineMetadata('tiamo:table:name', name || target.name, target)
+    }, args)
 }
 
 const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (target, key, desc) => {
     log('keyDescriptor', target, key, desc)
 
-    const metadata = metadataFor(target, key)
-
     // Dont rewrite existed tdv metadata
-    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
         required(target, key, desc)
     }
 
-    metadata[`tiamo:${type}`] = true
-    dynamodbFor(target)[`${type}Key`] = key
+    Reflect.defineMetadata(`tiamo:table:${type}`, key, target)
 }
 
 /**
@@ -57,36 +47,19 @@ export const rangeKey: FlexibleDecorator<never> = (...args) => {
 }
 
 const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (target, key, desc, [options]) => {
+    log('indexDescriptor', target, key, desc, options)
+
     const scope = global ? 'global' : 'local'
-    const defaultType = global ? 'hash' : 'range'
     const opts: IndexKeyOptions = options || {}
-
-    opts.name = opts.name || `${key}-${scope}`
-    opts.type = opts.type || defaultType
-
-    log('indexDescriptor', target, key, desc, opts)
-
-    const metadata = metadataFor(target, key)
+    const name = opts.name || `${key}-${scope}`
+    const type = opts.type || (global ? 'hash' : 'range')
 
     // Dont rewrite existed tdv metadata
-    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
         optional(target, key, desc)
     }
 
-    metadata[`tiamo:index:${scope}`] = opts
-
-    const dynamodb = dynamodbFor(target)
-    const indexes: any[] = dynamodb[`${scope}Indexes`] = dynamodb[`${scope}Indexes`] || []
-    let index = indexes.find(i => i.name === opts.name)
-    if (index) {
-        index[opts.type] = key
-    } else {
-        index = {
-            name: opts.name,
-            [opts.type]: key,
-        }
-        indexes.push(index)
-    }
+    Reflect.defineMetadata(`tiamo:table:index:${scope}:${name}:${type}`, key, target)
 }
 
 /**
@@ -112,10 +85,8 @@ const timestampDescriptor: HandleDescriptor = (target, key, desc, [opts]) => {
     const { type } = (opts || { type: 'create' }) as TimestampOptions
     log('timestampDescriptor', target, key, desc, type)
 
-    const metadata = metadataFor(target, key)
-
     // Dont rewrite existed tdv metadata
-    if (!metadata['tdv:joi'] && !metadata['tdv:ref']) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
         if (~['create', 'update'].indexOf(type)) {
             optional(j => j.date()
                 .iso()
@@ -123,7 +94,6 @@ const timestampDescriptor: HandleDescriptor = (target, key, desc, [opts]) => {
                     () => new Date().toISOString(),
                     `${type} iso 8601 timestamp`
                 )
-                // .description(`${type} timestamp`)
                 .tags(['timestamp'])
                 .example('1970-01-01T00:00:00.000Z')
             )(target, key, desc)
@@ -139,7 +109,7 @@ const timestampDescriptor: HandleDescriptor = (target, key, desc, [opts]) => {
         }
     }
 
-    metadata['tiamo:timestamp'] = type
+    Reflect.defineMetadata(`tiamo:timestamp:${type}`, key, target)
 }
 
 /**
@@ -151,4 +121,13 @@ export const timestamp: FlexibleDecorator<TimestampOptions> = (...args) => {
 
 export type TimestampOptions = {
     type?: 'create' | 'update' | 'expire'
+}
+
+/**
+ * Modify the enumerable property of the property descriptor.
+ */
+export const enumerable: FlexibleDecorator<boolean> = (...args) => {
+    return createDecorator((target, key, desc, [opts]) => {
+        desc.enumerable = false
+    }, args)
 }

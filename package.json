@@ -5,15 +5,19 @@
   "repository": "https://github.com/vitarn/tiamo",
   "author": "colder",
   "license": "MIT",
+  "main": "lib",
+  "module": "es",
+  "types": "lib",
   "scripts": {
     "pretest": "tsc -p tsconfig.prod.json --noEmit",
     "test": "jest --coverage --maxWorkers=4",
     "testing": "jest --watch",
     "release": "standard-version",
-    "prepack": "tsc -p tsconfig.prod.json"
+    "prepack": "rimraf lib && tsc -p tsconfig.prod.json -d && rimraf es && tsc -p tsconfig.prod.json -m es2015 --outDir es || echo"
   },
   "dependencies": {
-    "tdv": "^0.3.0"
+    "tdv": "^0.3.1",
+    "tslib": "^1.9.0"
   },
   "devDependencies": {
     "@types/jest": "^22.2.2",
@@ -23,6 +27,7 @@
     "dynalite": "^1.2.0",
     "jest": "^22.4.3",
     "joi": "12",
+    "rimraf": "^2.6.2",
     "standard-version": "^4.3.0",
     "test-listen": "^1.1.0",
     "ts-jest": "^22.4.2",
@@ -32,10 +37,8 @@
     "aws-sdk": "*"
   },
   "files": [
-    "**/*.js",
-    "**/*.d.ts",
-    "!coverage",
-    "!test"
+    "lib",
+    "es"
   ],
   "jest": {
     "transform": {

@@ -1,20 +1,18 @@
 {
     "compilerOptions": {
         "target": "es5",
+        "importHelpers": true,
         "esModuleInterop": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "declaration": true,
         "inlineSourceMap": true,
         "lib": [
             "esnext",
         ],
+        "outDir": "lib"
     },
-    "files": [
-        "index.ts"
-    ],
     "include": [
-        "lib",
+        "src",
         "test"
     ]
 }

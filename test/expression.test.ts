@@ -1,4 +1,4 @@
-import { expression } from '../lib/expression'
+import { expression } from '../src/expression'
 
 describe('expression', () => {
     it('prop = 1', () => {

@@ -3324,6 +3324,10 @@ redent@^2.0.0:
     indent-string "^3.0.0"
     strip-indent "^2.0.0"
 
+reflect-metadata@^0.1.12:
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/reflect-metadata/-/reflect-metadata-0.1.12.tgz#311bf0c6b63cd782f228a81abe146a2bfa9c56f2"
+
 regenerator-runtime@^0.11.0:
   version "0.11.1"
   resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.11.1.tgz#be05ad7f9bf7d22e056f9726cee5017fbf19e2e9"
@@ -3454,7 +3458,7 @@ right-align@^0.1.1:
   dependencies:
     align-text "^0.1.1"
 
-rimraf@2, rimraf@^2.5.1, rimraf@^2.5.4, rimraf@^2.6.1:
+rimraf@2, rimraf@^2.5.1, rimraf@^2.5.4, rimraf@^2.6.1, rimraf@^2.6.2:
   version "2.6.2"
   resolved "https://registry.yarnpkg.com/rimraf/-/rimraf-2.6.2.tgz#2ed8150d24a16ea8651e6d6ef0f47c4158ce7a36"
   dependencies:
@@ -3808,9 +3812,12 @@ tar@^2.2.1:
     fstream "^1.0.2"
     inherits "2"
 
-tdv@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/tdv/-/tdv-0.3.0.tgz#5a09546bc4049a7534ff01531b2136d0b70d2a07"
+tdv@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/tdv/-/tdv-0.3.1.tgz#08c7b2add5a652d6f3dbfacb5a64f8f9a096589d"
+  dependencies:
+    reflect-metadata "^0.1.12"
+    tslib "^1.9.0"
 
 test-exclude@^4.1.1:
   version "4.2.0"
@@ -3900,6 +3907,10 @@ ts-jest@^22.4.2:
     jest-config "^22.4.2"
     pkg-dir "^2.0.0"
     yargs "^11.0.0"
+
+tslib@^1.9.0:
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.9.0.tgz#e37a86fda8cbbaf23a057f473c9f4dc64e5fc2e8"
 
 tunnel-agent@^0.6.0:
   version "0.6.0"

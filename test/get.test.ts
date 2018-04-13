@@ -1,4 +1,4 @@
-import { Get } from '../lib/get'
+import { Get } from '../src/get'
 
 describe('Get', () => {
     describe('exprs', () => {

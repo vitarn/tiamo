@@ -1,5 +1,5 @@
-import { Model } from '../lib/model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../lib/decorator'
+import { Model } from '../src/model'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../src/decorator'
 
 describe('decorator', () => {
     describe('tableName', () => {
@@ -23,6 +23,12 @@ describe('decorator', () => {
 
             expect(Foo.tableName).toBe('foos')
         })
+
+        it('default class name if no decorator', async () => {
+            class Foo extends Model { }
+
+            expect(Foo.tableName).toBe('Foo')
+        })
     })
 
     describe('key', () => {
@@ -32,7 +38,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:hash']).toBe(true)
+            expect(Foo.hashKey).toBe('name')
         })
 
         it('mark range key', () => {
@@ -41,7 +47,7 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:range']).toBe(true)
+            expect(Foo.rangeKey).toBe('name')
         })
 
         it('hash/range key is required', () => {
@@ -80,32 +86,24 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:index:global']).toEqual({
-                name: 'name-global',
-                type: 'hash',
+            expect(Foo.globalIndexes).toEqual({
+                'name-global': {
+                    hash: 'name',
+                },
             })
-
-            expect(Foo.globalIndexes).toEqual([{
-                name: 'name-global',
-                hash: 'name',
-            }])
         })
 
         it('set global index name', () => {
             class Foo extends Model {
-                @globalIndex({ name: 'name-global-index' })
+                @globalIndex({ name: 'nameGlobalIndex' })
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:index:global']).toEqual({
-                name: 'name-global-index',
-                type: 'hash',
+            expect(Foo.globalIndexes).toEqual({
+                'nameGlobalIndex': {
+                    hash: 'name',
+                },
             })
-
-            expect(Foo.globalIndexes).toEqual([{
-                name: 'name-global-index',
-                hash: 'name',
-            }])
         })
 
         it('set composite global index', () => {
@@ -117,11 +115,12 @@ describe('decorator', () => {
                 age: number
             }
 
-            expect(Foo.globalIndexes).toEqual([{
-                name: 'name-age-global',
-                hash: 'name',
-                range: 'age',
-            }])
+            expect(Foo.globalIndexes).toEqual({
+                'name-age-global': {
+                    hash: 'name',
+                    range: 'age',
+                },
+            })
         })
 
         it('set local index', () => {
@@ -130,32 +129,24 @@ describe('decorator', () => {
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:index:local']).toEqual({
-                name: 'name-local',
-                type: 'range',
+            expect(Foo.localIndexes).toEqual({
+                'name-local': {
+                    range: 'name',
+                },
             })
-
-            expect(Foo.localIndexes).toEqual([{
-                name: 'name-local',
-                range: 'name',
-            }])
         })
 
         it('set local index name', () => {
             class Foo extends Model {
-                @localIndex({ name: 'name-local-index' })
+                @localIndex({ name: 'nameLocalIndex' })
                 name: string
             }
 
-            expect(Foo.metadata.name['tiamo:index:local']).toEqual({
-                name: 'name-local-index',
-                type: 'range',
+            expect(Foo.localIndexes).toEqual({
+                'nameLocalIndex': {
+                    range: 'name',
+                },
             })
-
-            expect(Foo.localIndexes).toEqual([{
-                name: 'name-local-index',
-                range: 'name',
-            }])
         })
 
         it('global/local index is optional', () => {

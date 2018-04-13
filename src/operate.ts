@@ -191,7 +191,7 @@ export class MultiReadOperate<M extends Model> extends ReadOperate<M> {
         })
 
         return {
-            ...compare<number | string>(),
+            ...compare<number | string | boolean | Date>(),
             between: f<[number | string, number | string]>('BETWEEN'),
             in: f<(number | string)[]>('IN'),
             exists: f<never>('attribute_exists'),
@@ -264,7 +264,7 @@ export class ConditionWriteOperate<M extends Model> extends WriteOperate<M> {
         })
 
         return {
-            ...compare<number | string>(),
+            ...compare<number | string | boolean | Date>(),
             between: f<[string, string]>('BETWEEN'),
             in: f<string[]>('IN'),
             exists: f<never>('attribute_exists'),

@@ -1,7 +1,7 @@
 import dynalite from 'dynalite'
 import listen from 'test-listen'
-import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../lib/model'
-import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../lib/decorator'
+import { Model, $batchGet, $batchWrite, $put, $get, $scan } from '../src/model'
+import { tableName, required, optional, hashKey, rangeKey, globalIndex, localIndex, timestamp } from '../src/decorator'
 
 const { AWS } = Model
 
@@ -18,7 +18,23 @@ describe('Model', () => {
                 .default(() => Math.random().toString(), 'random')
             )
             id: string
+
+            func = () => {}
+
+            unknown? = 'who'
         }
+
+        it('skip function property', () => {
+            let { value } = new Foo().validate()
+
+            expect(value.func).toBeUndefined()
+        })
+
+        it('strip unknown property', () => {
+            let { value } = new Foo().validate()
+
+            expect(value.unknown).toBeUndefined()
+        })
 
         it('validate before create', async () => {
             await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
@@ -50,15 +66,15 @@ describe('Model', () => {
 
         it('return timestamps from metadata', () => {
             expect(Foo.timestamps).toEqual({
-                create: ['createdAt'],
-                update: ['updatedAt'],
-                expire: ['expiredAt'],
+                create: 'createdAt',
+                update: 'updatedAt',
+                expire: 'expiredAt',
             })
 
             expect(Bar.timestamps).toEqual({
-                create: ['createdAt', 'createTime'],
-                update: ['updatedAt', 'updateTime'],
-                expire: ['expiredAt', 'expireTime'],
+                create: 'createTime',
+                update: 'updateTime',
+                expire: 'expireTime',
             })
         })
     })
@@ -73,8 +89,9 @@ describe('Model', () => {
                 deleteTableMs: 0,
             })
             const endpoint: string = await listen(dynaliteServer)
-            Model.ddb = new AWS.DynamoDB({ endpoint })
-            Model.client = new AWS.DynamoDB.DocumentClient({ service: Model.ddb })
+            Model.local(endpoint)
+            // Model.ddb = new AWS.DynamoDB({ endpoint })
+            // Model.client = new AWS.DynamoDB.DocumentClient({ service: Model.ddb })
         })
 
         afterEach(() => {

@@ -1,5 +1,5 @@
-import { BatchGet } from '../lib/batchGet'
-import { Model } from '../lib/model'
+import { BatchGet } from '../src/batchGet'
+import { Model } from '../src/model'
 
 describe('BatchGet', () => {
     class Example extends Model { }

@@ -1,8 +1,10 @@
 import debug from './debug'
-import { Schema, SchemaOptions, SchemaProperties } from 'tdv'
-import AWS, { DynamoDB } from 'aws-sdk'
+import { Schema, SchemaOptions, SchemaProperties, SchemaValidationOptions } from 'tdv'
+import { ValidationResult } from 'joi'
+import AWS from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-import { dynamodbFor } from './metadata'
+import { enumerable } from './decorator'
+import { Hook } from './hook'
 import { Put } from './put'
 import { Get } from './get'
 import { Query } from './query'
@@ -55,18 +57,27 @@ export class Model extends Schema {
     static client = new DocumentClient()
 
     /**
+     * Configure tiamo to use a DynamoDB local endpoint for testing.
+     * 
+     * @param endpoint defaults to 'http://localhost:4567'
+     */
+    static local(endpoint = 'http://localhost:4567') {
+        this.ddb = new AWS.DynamoDB({ endpoint })
+        this.client = new DocumentClient({ service: this.ddb })
+    }
+
+    /**
      * Table name store in metadata
      */
     static get tableName(): string {
-        return dynamodbFor(this.prototype).tableName || this.name
+        return Reflect.getOwnMetadata('tiamo:table:name', this) || this.name
     }
 
     /**
      * HASH key store in metadata
      */
     static get hashKey() {
-        const { metadata } = this
-        const key = Object.keys(metadata).find(key => metadata[key]['tiamo:hash'])
+        const key = Reflect.getOwnMetadata('tiamo:table:hash', this.prototype)
 
         if (!key) throw new Error(`Model ${this.name} missing hash key`)
 
@@ -77,44 +88,80 @@ export class Model extends Schema {
      * RANGE key store in metadata
      */
     static get rangeKey() {
-        const { metadata } = this
-
-        return Object.keys(metadata).find(key => metadata[key]['tiamo:range'])
+        return Reflect.getOwnMetadata('tiamo:table:range', this.prototype)
     }
 
     /**
      * Global indexes definition store in metadata
      */
     static get globalIndexes() {
-        return dynamodbFor(this.prototype).globalIndexes
+        return this.getIndexes()
     }
 
     /**
      * Local indexes definition store in metadata
      */
     static get localIndexes() {
-        return dynamodbFor(this.prototype).localIndexes
+        return this.getIndexes('local')
     }
+
+    private static getIndexes(scope: 'global' | 'local' = 'global') {
+        const cacheKey = `tiamo:cache:${scope}Indexes`
+
+        if (Reflect.hasOwnMetadata(cacheKey, this)) {
+            return Reflect.getOwnMetadata(cacheKey, this)
+        }
+
+        const indexes = (Reflect.getMetadataKeys(this.prototype) as string[])
+            .reduce((res, key) => {
+                if (!key.startsWith(`tiamo:table:index:${scope}:`)) return res
+
+                const [type, name] = key.split(':').reverse()
+
+                res[name] = res[name] || {}
+                res[name][type] = Reflect.getMetadata(key, this.prototype)
+
+                return res
+            }, {})
+
+        Reflect.defineMetadata(cacheKey, indexes, this)
+
+        return indexes
+    }
+
+    /**
+     * Hook singleton instance
+     */
+    // protected static get hook() {
+    //     const modelMeta = modelMetaFor(this.prototype)
+
+    //     return modelMeta.hook = modelMeta.hook || new Hook()
+    // }
+    protected static hook = new Hook()
 
     /**
      * Timestamps definition store in metadata
      */
 
     static get timestamps() {
-        const { metadata } = this
+        const cacheKey = 'tiamo:cache:timestamps'
 
-        return Object.keys(metadata)
-            .reduce((obj, key) => {
-                const timestamp = metadata[key]['tiamo:timestamp']
-                if (timestamp) {
-                    obj[timestamp].push(key)
-                }
-                return obj
-            }, {
-                create: [] as string[],
-                update: [] as string[],
-                expire: [] as string[],
-            })
+        if (Reflect.hasOwnMetadata(cacheKey, this)) {
+            return Reflect.getOwnMetadata(cacheKey, this)
+        }
+
+        const timestamps = {}
+        
+        for (let type of ['create', 'update', 'expire']) {
+            const key = `tiamo:timestamp:${type}`
+            if (Reflect.hasMetadata(key, this.prototype)) {
+                timestamps[type] = Reflect.getMetadata(key, this.prototype)
+            }
+        }
+
+        Reflect.defineMetadata(cacheKey, timestamps, this)
+        
+        return timestamps
     }
 
     /**
@@ -397,6 +444,47 @@ export class Model extends Schema {
     constructor(props?, options?: SchemaOptions) {
         super(props, options)
     }
+
+    /**
+     * Pre hook
+     */
+    pre(name: string, fn: Function) {
+        this.constructor.hook.pre(name, fn)
+
+        return this
+    }
+
+    /**
+     * Post hook
+     */
+    post(name: string, fn: Function) {
+        this.constructor.hook.post(name, fn)
+
+        return this
+    }
+
+    /**
+     * Validate by Joi
+     * 
+     * * Be careful the value returned is a new instance. This is design by Joi.
+     * * We strip unknown properties so you can put your fields safely.
+     */
+    validate(options = {} as SchemaValidationOptions) {
+        return this._validate(options)
+    }
+    // @enumerable(false)
+    get _validate() {
+        return this.constructor.hook.wrap('validate', (options = {} as SchemaValidationOptions) => {
+            return super.validate({
+                // when true, ignores unknown keys with a function value. Defaults to false.
+                skipFunctions: true,
+                // when true, all unknown elements will be removed.
+                stripUnknown: true,
+                ...options,
+            })
+        })
+    }
+    // set _validate(v) { }
 
     /**
      * Save into db

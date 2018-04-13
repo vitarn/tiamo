@@ -1,5 +1,5 @@
-import { Scan } from '../lib/scan'
-import { Model } from '../lib/model'
+import { Scan } from '../src/scan'
+import { Model } from '../src/model'
 
 describe('Scan', () => {
     describe('toJSON', () => {
