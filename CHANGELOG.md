@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.5.0"></a>
+# [0.5.0](https://github.com/vitarn/tiamo/compare/v0.4.0...v0.5.0) (2018-04-14)
+
+
+### Features
+
+* **decorator:** add [@timestamp](https://github.com/timestamp) ([2166a6e](https://github.com/vitarn/tiamo/commit/2166a6e))
+* **model:** batch slice process ([1d85af0](https://github.com/vitarn/tiamo/commit/1d85af0))
+* **model:** static getter timestamps ([24756cb](https://github.com/vitarn/tiamo/commit/24756cb))
+
+
+
 <a name="0.4.0"></a>
 # [0.4.0](https://github.com/vitarn/tiamo/compare/v0.3.1...v0.4.0) (2018-04-10)
 
