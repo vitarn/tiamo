@@ -20,12 +20,12 @@ describe('Model', () => {
         it('default is new', () => {
             let foo1 = new Foo()
 
-            expect(foo1.isNew).toBe(true)
+            expect(foo1.isNew()).toBe(true)
 
             let foo2 = new Foo({}, { isNew: false })
 
-            expect(foo2.isNew).toBe(false)
-            expect(foo1.isNew).toBe(true)
+            expect(foo2.isNew()).toBe(false)
+            expect(foo1.isNew()).toBe(true)
         })
     })
 
@@ -53,9 +53,9 @@ describe('Model', () => {
             expect(value.unknown).toBeUndefined()
         })
 
-        it('validate before create', async () => {
-            await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
-        })
+        // it('validate before create', async () => {
+        //     await expect(Foo.create({ id: 42 as any })).rejects.toThrow('"id" must be a string')
+        // })
 
         it('validate before create', async () => {
             await expect(new Foo({ id: 42 as any }).save()).rejects.toThrow('"id" must be a string')
@@ -325,6 +325,10 @@ describe('Model', () => {
                 expect(e.name).toBeUndefined()
                 expect(e.arr[0]).toBe('1')
             })
+
+            it('allow call then() without arguments', async () => {
+                await expect(GetExample.get({ id: '1' }).then().then()).resolves.toBeDefined()
+            })
         })
 
         describe('query', () => {
@@ -462,6 +466,14 @@ describe('Model', () => {
 
                 expect(m.id).toBe('1')
             })
+
+            it('throw if query without cond', async () => {
+                await expect(Example.query()).rejects.toThrow('Either the KeyConditions or KeyConditionExpression parameter must be specified in the request.')
+            })
+
+            it('allow call then() without arguments', async () => {
+                await expect(Example.query().where('id').eq('1').then().then()).resolves.toBeDefined()
+            })
         })
 
         describe('scan', () => {
@@ -530,6 +542,10 @@ describe('Model', () => {
                 let c = await ScanExample.scan().filter('id').gt(3).count()
 
                 expect(c).toBe(2)
+            })
+
+            it('allow call then() without arguments', async () => {
+                await expect(ScanExample.scan().then().then()).resolves.toBeDefined()
             })
         })
 
@@ -752,6 +768,18 @@ describe('Model', () => {
             it('update id = 1 nothing', async () => {
                 await expect(Example.update({ id: '1' })).rejects.toThrow('Update expression is empty')
             })
+
+            it('update id = 1 set name to empty string', async () => {
+                let u = Example.update({ id: '1' })
+                    .set('name').to('')
+
+                expect(u.toJSON().ExpressionAttributeValues[':name']).toBeNull()
+                await expect(u.then()).resolves.not.toThrow()
+            })
+
+            it('allow call then() without arguments', async () => {
+                await expect(Example.update({id: '1'}).remove('name').then().then()).resolves.toBeDefined()
+            })
         })
 
         describe('delete', () => {
@@ -869,6 +897,10 @@ describe('Model', () => {
                 let a = await Example.query().where('id').eq('4')
 
                 expect(a.length).toBe(0)
+            })
+
+            it('allow call then() without arguments', async () => {
+                await expect(Example.delete({ id: '1' }).then().then()).resolves.toBeDefined()
             })
         })
 
@@ -1068,6 +1100,14 @@ describe('Model', () => {
                     .get([{ id: 1 }, { id: 2 }])
 
                 await expect(p).resolves.toHaveLength(2)
+            })
+
+            it('allow call then() without arguments', async () => {
+                await expect(BatchExample.batch().put([{ id: 1 }]).get([{ id: 1 }]).then().then()).resolves.toBeDefined()
+            })
+
+            it('throw if call catch() without arguments', async () => {
+                await expect(BatchExample.batch().get([]).catch().catch()).rejects.toThrow('Member must have length greater than or equal to 1')
             })
         })
 

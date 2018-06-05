@@ -91,7 +91,7 @@ export class Query<M extends Model, R extends M | M[]> extends MultiReadOperate<
     }
 
     async then<TRes>(
-        onfulfilled?: (value?: R) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: R) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         try {
@@ -105,7 +105,7 @@ export class Query<M extends Model, R extends M | M[]> extends MultiReadOperate<
                 }
                 result.push(res)
             }
-            onfulfilled(this.options.one ? first : result)
+            return onfulfilled(this.options.one ? first : result)
         } catch (err) {
             onrejected(err)
         }

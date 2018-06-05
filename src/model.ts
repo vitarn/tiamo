@@ -184,12 +184,12 @@ export class Model extends Database {
         this.pre('save', this.validate.bind(this))
     }
 
-    get isNew() {
+    isNew() {
         return !!Reflect.getOwnMetadata('tiamo:cache:new', this)
     }
-    set isNew(value: boolean) {
-        Reflect.defineMetadata('tiamo:cache:new', value, this)
-    }
+    // set isNew(value: boolean) {
+    //     Reflect.defineMetadata('tiamo:cache:new', value, this)
+    // }
 
     /**
      * Hook instance

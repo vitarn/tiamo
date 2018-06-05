@@ -28,7 +28,7 @@ export class Get<M extends Model> extends ReadOperate<M> {
     }
 
     then<TRes>(
-        onfulfilled?: (value?: M) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: M) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         const { Model } = this.options

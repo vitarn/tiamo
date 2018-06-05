@@ -63,7 +63,7 @@ export class BatchWrite<M extends Model> extends WriteOperate<M> implements Asyn
     }
 
     async then<TRes>(
-        onfulfilled?: (value?: number) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: number) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         try {
@@ -72,9 +72,13 @@ export class BatchWrite<M extends Model> extends WriteOperate<M> implements Asyn
             for await (let m of this) {
                 time++
             }
-            onfulfilled(time)
+            return onfulfilled(time)
         } catch (err) {
-            onrejected(err)
+            if (onrejected) {
+                onrejected(err)
+            } else {
+                throw err
+            }
         }
     }
 

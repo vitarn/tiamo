@@ -1,7 +1,7 @@
 import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { Model, $update } from './model'
-import { expression, ExpressionLogic } from './expression'
+import { expression } from './expression'
 import { ConditionWriteOperate, OperateOptions } from './operate'
 
 export class Update<M extends Model> extends ConditionWriteOperate<M> {
@@ -28,6 +28,11 @@ export class Update<M extends Model> extends ConditionWriteOperate<M> {
     set(key: string) {
         const { options } = this
         const f = <V>(op: string, op2?: string) => (val?: V) => {
+            if (op === '=' && (val as any) === '') {
+                // return this.remove(key)
+                val = null
+            }
+
             const { exprs, names, values } = expression(key)(op, op2)(val)
             exprs.forEach(e => options.setExprs.add(e))
             Object.assign(options.names, names)
@@ -86,7 +91,7 @@ export class Update<M extends Model> extends ConditionWriteOperate<M> {
     }
 
     then<TRes>(
-        onfulfilled?: (value?: M) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: M) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         const params = this.toJSON()

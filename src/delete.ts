@@ -23,7 +23,7 @@ export class Delete<M extends Model> extends ConditionWriteOperate<M> {
     }
 
     then<TRes>(
-        onfulfilled?: (value?: M) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: M) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         const params = this.toJSON()

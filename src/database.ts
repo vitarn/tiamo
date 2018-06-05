@@ -43,7 +43,9 @@ export class Database extends Schema {
     //     return this._documentClient
     //         || (this._documentClient = new DocumentClient())
     // }
-    static client = new DocumentClient()
+    static client = new DocumentClient({
+        convertEmptyValues: true
+    })
 
     /**
      * Configure tiamo to use a DynamoDB local endpoint for testing.

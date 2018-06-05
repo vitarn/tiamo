@@ -41,7 +41,7 @@ export class Scan<M extends Model> extends MultiReadOperate<M> implements AsyncI
     }
 
     async then<TRes>(
-        onfulfilled?: (value?: M[]) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: M[]) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         try {
@@ -49,7 +49,8 @@ export class Scan<M extends Model> extends MultiReadOperate<M> implements AsyncI
             for await (let res of this) {
                 result.push(res)
             }
-            onfulfilled(result)
+
+            return onfulfilled(result)
         } catch (err) {
             onrejected(err)
         }

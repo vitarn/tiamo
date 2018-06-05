@@ -49,7 +49,7 @@ export class BatchGet<M extends Model> extends ReadOperate<M> implements AsyncIt
     }
 
     async then<TRes>(
-        onfulfilled?: (value?: M[]) => TRes | PromiseLike<TRes>,
+        onfulfilled: (value?: M[]) => TRes | PromiseLike<TRes> = (r => r) as any,
         onrejected?: (reason: any) => TRes | PromiseLike<TRes>,
     ) {
         try {
@@ -57,9 +57,13 @@ export class BatchGet<M extends Model> extends ReadOperate<M> implements AsyncIt
             for await (let m of this) {
                 result.push(m)
             }
-            onfulfilled(result)
+            return onfulfilled(result)
         } catch (err) {
-            onrejected(err)
+            if (onrejected) {
+                onrejected(err)
+            } else {
+                throw err
+            }
         }
     }
 
