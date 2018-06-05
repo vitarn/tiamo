@@ -25,7 +25,7 @@ const keyDescriptor: (type: 'hash' | 'range') => HandleDescriptor = type => (tar
     log('keyDescriptor', target, key, desc)
 
     // Dont rewrite existed tdv metadata
-    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key.toString()}`, target)) {
         required(target, key, desc)
     }
 
@@ -51,11 +51,11 @@ const indexDescriptor: (global?: boolean) => HandleDescriptor = global => (targe
 
     const scope = global ? 'global' : 'local'
     const opts: IndexKeyOptions = options || {}
-    const name = opts.name || `${key}-${scope}`
+    const name = opts.name || `${key.toString()}-${scope}`
     const type = opts.type || (global ? 'hash' : 'range')
 
     // Dont rewrite existed tdv metadata
-    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key.toString()}`, target)) {
         optional(target, key, desc)
     }
 
@@ -86,7 +86,7 @@ const timestampDescriptor: HandleDescriptor = (target, key, desc, [opts]) => {
     log('timestampDescriptor', target, key, desc, type)
 
     // Dont rewrite existed tdv metadata
-    if (!Reflect.hasOwnMetadata(`tdv:key:${key}`, target)) {
+    if (!Reflect.hasOwnMetadata(`tdv:key:${key.toString()}`, target)) {
         if (~['create', 'update'].indexOf(type)) {
             optional(j => j.date()
                 .iso()
