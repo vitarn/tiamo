@@ -90,14 +90,18 @@ export class Database extends Schema {
     /**
      * Local indexes definition store in metadata
      */
-    static get localIndexes() {
+    static get localIndexes(): {
+        [name: string]: {
+            rangeKey: string
+        }
+    } {
         return this.getIndexes('local')
     }
 
     private static getIndexes(scope: 'global' | 'local' = 'global'): {
         [name: string]: {
-            hash: string
-            range: string
+            hashKey: string
+            rangeKey: string
         }
     } {
         const cacheKey = `tiamo:cache:${scope}Indexes`
@@ -113,7 +117,7 @@ export class Database extends Schema {
                 const [type, name] = key.split(':').reverse()
 
                 res[name] = res[name] || {}
-                res[name][type] = Reflect.getMetadata(key, this.prototype)
+                res[name][`${type}Key`] = Reflect.getMetadata(key, this.prototype)
 
                 return res
             }, {})
@@ -277,6 +281,44 @@ export class Database extends Schema {
             if (res.ItemCollectionMetrics) log('⇣ [DELETE] item collection metrics: ', res.ItemCollectionMetrics)
             return res.Attributes
         })
+    }
+
+    ['constructor']: DatabaseStatic<this>
+
+    /**
+     * Get Key object
+     * 
+     * @param indexName index name
+     */
+    getKey(indexName?: string) {
+        let hashKey: string
+        let rangeKey: string
+
+        if (indexName) {
+            const { globalIndexes } = this.constructor
+
+            if (globalIndexes[indexName]) {
+                hashKey = globalIndexes[indexName].hashKey
+                rangeKey = globalIndexes[indexName].rangeKey
+            } else {
+                const { localIndexes } = this.constructor
+
+                if (localIndexes[indexName]) {
+                    hashKey = this.constructor.hashKey
+                    rangeKey = localIndexes[indexName].rangeKey
+                }
+            }
+        } else {
+            hashKey = this.constructor.hashKey
+            rangeKey = this.constructor.rangeKey
+        }
+
+        if (hashKey) {
+            const Key = { [hashKey]: this[hashKey] } as any
+            if (rangeKey) Key[rangeKey] = this[rangeKey]
+
+            return Key
+        }
     }
 }
 

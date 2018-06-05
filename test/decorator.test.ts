@@ -88,7 +88,7 @@ describe('decorator', () => {
 
             expect(Foo.globalIndexes).toEqual({
                 'name-global': {
-                    hash: 'name',
+                    hashKey: 'name',
                 },
             })
         })
@@ -101,7 +101,7 @@ describe('decorator', () => {
 
             expect(Foo.globalIndexes).toEqual({
                 'nameGlobalIndex': {
-                    hash: 'name',
+                    hashKey: 'name',
                 },
             })
         })
@@ -117,8 +117,8 @@ describe('decorator', () => {
 
             expect(Foo.globalIndexes).toEqual({
                 'name-age-global': {
-                    hash: 'name',
-                    range: 'age',
+                    hashKey: 'name',
+                    rangeKey: 'age',
                 },
             })
         })
@@ -131,7 +131,7 @@ describe('decorator', () => {
 
             expect(Foo.localIndexes).toEqual({
                 'name-local': {
-                    range: 'name',
+                    rangeKey: 'name',
                 },
             })
         })
@@ -144,7 +144,7 @@ describe('decorator', () => {
 
             expect(Foo.localIndexes).toEqual({
                 'nameLocalIndex': {
-                    range: 'name',
+                    rangeKey: 'name',
                 },
             })
         })

@@ -258,11 +258,11 @@ export class Model extends Database {
     get save() {
         return this[$hook].wrap('save', (options?) => {
             const Item = this.validate({ apply: true, raise: true }).value
-            const { hashKey, rangeKey } = this.constructor
-            const put = this.constructor.put(Item).where(hashKey).not.exists()
-            if (rangeKey) put.where(rangeKey).not.exists()
+            // const { hashKey, rangeKey } = this.constructor
+            // const put = this.constructor.put(Item).where(hashKey).not.exists()
+            // if (rangeKey) put.where(rangeKey).not.exists()
 
-            return put
+            return this.constructor.put(Item)
         })
     }
 
@@ -270,11 +270,7 @@ export class Model extends Database {
      * Delete from db by key
      */
     delete(options?) {
-        const { hashKey, rangeKey } = this.constructor
-        const Key: DocumentClient.Key = { [hashKey]: this[hashKey] }
-        if (rangeKey) Key[rangeKey] = this[rangeKey]
-        
-        return this.constructor.delete(Key)
+        return this.constructor.delete(this.getKey())
             .then(() => this)
     }
 }
