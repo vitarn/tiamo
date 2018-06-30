@@ -30,7 +30,7 @@
     "rimraf": "^2.6.2",
     "standard-version": "^4.4.0",
     "test-listen": "^1.1.0",
-    "ts-jest": "^22.4.6",
+    "ts-jest": "^23.0.0",
     "typescript": "^2.9.1"
   },
   "peerDependencies": {
