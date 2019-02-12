@@ -20,7 +20,7 @@
     "tslib": "^1.9.2"
   },
   "devDependencies": {
-    "@types/jest": "^23.0.0",
+    "@types/jest": "^24.0.3",
     "@types/joi": "^13.0.8",
     "@types/node": "^10.3.1",
     "aws-sdk": "^2.218.1",
